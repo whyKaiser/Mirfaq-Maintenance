@@ -6,6 +6,7 @@ import unitsRouter from "./units";
 import requestsRouter from "./requests";
 import techniciansRouter from "./technicians";
 import dashboardRouter from "./dashboard";
+import residentsRouter from "./residents";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(unitsRouter);
 router.use(requestsRouter);
 router.use(techniciansRouter);
 router.use(dashboardRouter);
+router.use(residentsRouter);
 
 export default router;

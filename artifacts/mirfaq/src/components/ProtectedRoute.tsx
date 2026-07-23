@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { useGetMe } from '@workspace/api-client-react';
+import { useGetMe, getGetMeQueryKey } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
 import type { AuthUser } from '@workspace/api-client-react';
 
@@ -15,6 +15,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   const { data, isLoading, isError } = useGetMe({
     query: {
+      queryKey: getGetMeQueryKey(),
       retry: false,
       enabled: !user,
       staleTime: 5 * 60 * 1000,
