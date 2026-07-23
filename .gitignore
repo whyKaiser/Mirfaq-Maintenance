@@ -28,6 +28,12 @@ node_modules
 !.vscode/extensions.json
 
 # misc
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.db-journal
+**/uploads/
 /.sass-cache
 /connect.lock
 /coverage
