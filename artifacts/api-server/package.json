@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env MIRFAQ_DB_URL=file:./dev.db prisma db push && cross-env NODE_ENV=development PORT=5000 MIRFAQ_DB_URL=file:./dev.db tsx watch src/index.ts",
+    "dev": "node ./scripts/dev-bootstrap.mjs",
+    "db:bootstrap": "node ./scripts/dev-bootstrap.mjs --prepare-only",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

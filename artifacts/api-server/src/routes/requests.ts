@@ -5,6 +5,29 @@ import { logAction } from "../lib/audit";
 import { getFileUrl } from "../lib/storage";
 
 const router = Router();
+const MAX_COST_SAR = 10_000_000;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function costToHalalas(value: unknown): number | null {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > MAX_COST_SAR
+  ) {
+    return null;
+  }
+
+  const scaled = value * 100;
+  const rounded = Math.round(scaled);
+  if (!Number.isSafeInteger(rounded) || Math.abs(scaled - rounded) > 0.000001) {
+    return null;
+  }
+  return rounded;
+}
 
 const includeRelations = {
   property: { select: { name: true } },
@@ -15,6 +38,8 @@ const includeRelations = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function fmtRequest(r: any) {
+  const laborCostHalalas = r.laborCostHalalas ?? 0;
+  const partsCostHalalas = r.partsCostHalalas ?? 0;
   return {
     id: r.id,
     title: r.title,
@@ -28,10 +53,21 @@ function fmtRequest(r: any) {
     unitNumber: r.unit?.number ?? null,
     residentId: r.residentId,
     residentName: r.resident?.name ?? null,
+    reporterName: r.reporterName ?? null,
+    reporterPhone: r.reporterPhone ?? null,
     technicianId: r.technicianId ?? null,
     technicianName: r.technician?.user?.name ?? null,
-    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-    updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
+    laborCost: laborCostHalalas / 100,
+    partsCost: partsCostHalalas / 100,
+    totalCost: (laborCostHalalas + partsCostHalalas) / 100,
+    rating: r.rating ?? null,
+    ratingComment: r.ratingComment ?? null,
+    ratedAt:
+      r.ratedAt instanceof Date ? r.ratedAt.toISOString() : (r.ratedAt ?? null),
+    createdAt:
+      r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    updatedAt:
+      r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt,
   };
 }
 
@@ -48,7 +84,9 @@ router.get("/requests", requireAuth, async (req, res) => {
     if (role === "resident") {
       where.residentId = userId;
     } else if (role === "technician") {
-      const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
+      const profile = await prisma.technicianProfile.findUnique({
+        where: { userId },
+      });
       if (!profile) return res.json([]);
       where.technicianId = profile.id;
     }
@@ -71,11 +109,20 @@ router.get("/requests", requireAuth, async (req, res) => {
 router.post("/requests", requireRole("resident"), async (req, res) => {
   try {
     const { title, description, category, priority, unitId } = req.body as {
-      title?: string; description?: string; category?: string;
-      priority?: string; unitId?: string;
+      title?: string;
+      description?: string;
+      category?: string;
+      priority?: string;
+      unitId?: string;
     };
 
-    if (!title?.trim() || !description?.trim() || !category || !priority || !unitId) {
+    if (
+      !title?.trim() ||
+      !description?.trim() ||
+      !category ||
+      !priority ||
+      !unitId
+    ) {
       return res.status(400).json({ error: "جميع الحقول مطلوبة" });
     }
 
@@ -137,12 +184,18 @@ router.get("/requests/:id", requireAuth, async (req, res) => {
     const userId = req.session.userId!;
 
     if (role === "resident" && request.residentId !== userId) {
-      return res.status(403).json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
+      return res
+        .status(403)
+        .json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
     }
     if (role === "technician") {
-      const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
+      const profile = await prisma.technicianProfile.findUnique({
+        where: { userId },
+      });
       if (!profile || request.technicianId !== profile.id) {
-        return res.status(403).json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
+        return res
+          .status(403)
+          .json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
       }
     }
 
@@ -166,26 +219,39 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
     if (!existing) return res.status(404).json({ error: "البلاغ غير موجود" });
 
     const { status, priority, technicianId, title, description } = req.body as {
-      status?: string; priority?: string; technicianId?: string | null;
-      title?: string; description?: string;
+      status?: string;
+      priority?: string;
+      technicianId?: string | null;
+      title?: string;
+      description?: string;
     };
 
     if (role === "resident") {
       if (existing.residentId !== userId) {
-        return res.status(403).json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
+        return res
+          .status(403)
+          .json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
       }
       if (status || technicianId !== undefined || priority) {
-        return res.status(403).json({ error: "لا يمكنك تغيير الحالة أو الأولوية" });
+        return res
+          .status(403)
+          .json({ error: "لا يمكنك تغيير الحالة أو الأولوية" });
       }
     }
 
     if (role === "technician") {
-      const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
+      const profile = await prisma.technicianProfile.findUnique({
+        where: { userId },
+      });
       if (!profile || existing.technicianId !== profile.id) {
-        return res.status(403).json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
+        return res
+          .status(403)
+          .json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
       }
       if (technicianId !== undefined || priority) {
-        return res.status(403).json({ error: "لا يمكنك تغيير الفني أو الأولوية" });
+        return res
+          .status(403)
+          .json({ error: "لا يمكنك تغيير الفني أو الأولوية" });
       }
     }
 
@@ -193,7 +259,8 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
     const updateData: any = {};
     if (status) updateData.status = status;
     if (priority) updateData.priority = priority;
-    if (technicianId !== undefined) updateData.technicianId = technicianId || null;
+    if (technicianId !== undefined)
+      updateData.technicianId = technicianId || null;
     if (title?.trim()) updateData.title = title.trim();
     if (description?.trim()) updateData.description = description.trim();
 
@@ -206,17 +273,55 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
     // Audit log for significant changes (manager actions)
     if (role === "manager") {
       if (status && status !== existing.status) {
-        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_status", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.status, to: status } });
+        await logAction({
+          organizationId: orgId,
+          actorId: userId,
+          actorName: req.session.userName!,
+          action: "change_status",
+          entityType: "request",
+          entityId: existing.id,
+          entityLabel: existing.title,
+          details: { from: existing.status, to: status },
+        });
       }
       if (priority && priority !== existing.priority) {
-        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_priority", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.priority, to: priority } });
+        await logAction({
+          organizationId: orgId,
+          actorId: userId,
+          actorName: req.session.userName!,
+          action: "change_priority",
+          entityType: "request",
+          entityId: existing.id,
+          entityLabel: existing.title,
+          details: { from: existing.priority, to: priority },
+        });
       }
-      if (technicianId !== undefined && technicianId !== existing.technicianId) {
-        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "assign_technician", entityType: "request", entityId: existing.id, entityLabel: existing.title });
+      if (
+        technicianId !== undefined &&
+        technicianId !== existing.technicianId
+      ) {
+        await logAction({
+          organizationId: orgId,
+          actorId: userId,
+          actorName: req.session.userName!,
+          action: "assign_technician",
+          entityType: "request",
+          entityId: existing.id,
+          entityLabel: existing.title,
+        });
       }
     }
     if (role === "technician" && status && status !== existing.status) {
-      await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_status", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.status, to: status } });
+      await logAction({
+        organizationId: orgId,
+        actorId: userId,
+        actorName: req.session.userName!,
+        action: "change_status",
+        entityType: "request",
+        entityId: existing.id,
+        entityLabel: existing.title,
+        details: { from: existing.status, to: status },
+      });
     }
 
     res.json(fmtRequest(request));
@@ -226,11 +331,173 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/requests/:id/costs (manager only)
+router.patch(
+  "/requests/:id/costs",
+  requireRole("manager"),
+  async (req, res) => {
+    try {
+      if (!isRecord(req.body)) {
+        return res.status(400).json({ error: "بيانات التكلفة غير صالحة" });
+      }
+
+      const { laborCost, partsCost } = req.body;
+      if (laborCost === undefined && partsCost === undefined) {
+        return res.status(400).json({ error: "أدخل تكلفة العمالة أو القطع" });
+      }
+
+      const laborCostHalalas =
+        laborCost === undefined ? undefined : costToHalalas(laborCost);
+      const partsCostHalalas =
+        partsCost === undefined ? undefined : costToHalalas(partsCost);
+      if (
+        (laborCost !== undefined && laborCostHalalas === null) ||
+        (partsCost !== undefined && partsCostHalalas === null)
+      ) {
+        return res.status(400).json({
+          error:
+            "التكلفة يجب أن تكون من 0 إلى 10,000,000 ريال وبحد أقصى منزلتين عشريتين",
+        });
+      }
+
+      const orgId = req.session.organizationId!;
+      const existing = await prisma.maintenanceRequest.findFirst({
+        where: { id: req.params.id, organizationId: orgId },
+      });
+      if (!existing) {
+        return res.status(404).json({ error: "البلاغ غير موجود" });
+      }
+
+      const request = await prisma.maintenanceRequest.update({
+        where: { id: existing.id },
+        data: {
+          ...(typeof laborCostHalalas === "number" && { laborCostHalalas }),
+          ...(typeof partsCostHalalas === "number" && { partsCostHalalas }),
+        },
+        include: includeRelations,
+      });
+
+      await logAction({
+        organizationId: orgId,
+        actorId: req.session.userId!,
+        actorName: req.session.userName!,
+        action: "update_request_costs",
+        entityType: "request",
+        entityId: request.id,
+        entityLabel: request.title,
+        details: {
+          laborCost: request.laborCostHalalas / 100,
+          partsCost: request.partsCostHalalas / 100,
+        },
+      });
+
+      res.json(fmtRequest(request));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
+    }
+  },
+);
+
+// POST /api/requests/:id/rating (resident who owns completed request)
+router.post(
+  "/requests/:id/rating",
+  requireRole("resident"),
+  async (req, res) => {
+    try {
+      if (!isRecord(req.body)) {
+        return res.status(400).json({ error: "بيانات التقييم غير صالحة" });
+      }
+      const { rating, comment } = req.body;
+      if (
+        typeof rating !== "number" ||
+        !Number.isInteger(rating) ||
+        rating < 1 ||
+        rating > 5
+      ) {
+        return res
+          .status(400)
+          .json({ error: "التقييم يجب أن يكون عددًا صحيحًا من 1 إلى 5" });
+      }
+      if (comment !== undefined && typeof comment !== "string") {
+        return res.status(400).json({ error: "التعليق غير صالح" });
+      }
+      const ratingComment = typeof comment === "string" ? comment.trim() : "";
+      if (ratingComment.length > 1000) {
+        return res.status(400).json({ error: "التعليق أطول من الحد المسموح" });
+      }
+
+      const request = await prisma.maintenanceRequest.findFirst({
+        where: {
+          id: req.params.id,
+          organizationId: req.session.organizationId!,
+          residentId: req.session.userId!,
+        },
+      });
+      if (!request) {
+        return res.status(404).json({ error: "البلاغ غير موجود" });
+      }
+      if (request.status !== "مكتملة") {
+        return res
+          .status(409)
+          .json({ error: "يمكن تقييم البلاغ بعد اكتماله فقط" });
+      }
+      if (request.rating !== null) {
+        return res.status(409).json({ error: "تم تقييم البلاغ مسبقًا" });
+      }
+
+      const result = await prisma.maintenanceRequest.updateMany({
+        where: {
+          id: request.id,
+          organizationId: req.session.organizationId!,
+          residentId: req.session.userId!,
+          status: "مكتملة",
+          rating: null,
+        },
+        data: {
+          rating,
+          ratingComment: ratingComment || null,
+          ratedAt: new Date(),
+        },
+      });
+      if (result.count !== 1) {
+        return res.status(409).json({ error: "تم تقييم البلاغ مسبقًا" });
+      }
+      const updated = await prisma.maintenanceRequest.findUnique({
+        where: { id: request.id },
+        include: includeRelations,
+      });
+      if (!updated) {
+        return res.status(404).json({ error: "البلاغ غير موجود" });
+      }
+
+      await logAction({
+        organizationId: req.session.organizationId!,
+        actorId: req.session.userId!,
+        actorName: req.session.userName!,
+        action: "rate_request",
+        entityType: "request",
+        entityId: request.id,
+        entityLabel: request.title,
+        details: { rating },
+      });
+
+      res.json(fmtRequest(updated));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
+    }
+  },
+);
+
 // GET /api/requests/:requestId/comments
 router.get("/requests/:requestId/comments", requireAuth, async (req, res) => {
   try {
     const request = await prisma.maintenanceRequest.findFirst({
-      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
+      where: {
+        id: req.params.requestId,
+        organizationId: req.session.organizationId!,
+      },
     });
     if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
 
@@ -246,15 +513,17 @@ router.get("/requests/:requestId/comments", requireAuth, async (req, res) => {
       orderBy: { createdAt: "asc" },
     });
 
-    res.json(comments.map((c) => ({
-      id: c.id,
-      content: c.content,
-      requestId: c.requestId,
-      authorId: c.authorId,
-      authorName: c.author.name,
-      authorRole: c.author.role,
-      createdAt: c.createdAt.toISOString(),
-    })));
+    res.json(
+      comments.map((c) => ({
+        id: c.id,
+        content: c.content,
+        requestId: c.requestId,
+        authorId: c.authorId,
+        authorName: c.author.name,
+        authorRole: c.author.role,
+        createdAt: c.createdAt.toISOString(),
+      })),
+    );
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "خطأ في الخادم" });
@@ -272,23 +541,36 @@ router.post("/requests/:requestId/comments", requireAuth, async (req, res) => {
     }
 
     const request = await prisma.maintenanceRequest.findFirst({
-      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
+      where: {
+        id: req.params.requestId,
+        organizationId: req.session.organizationId!,
+      },
     });
     if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
 
     const role = req.session.userRole!;
     if (role === "resident" && request.residentId !== userId) {
-      return res.status(403).json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
+      return res
+        .status(403)
+        .json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
     }
     if (role === "technician") {
-      const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
+      const profile = await prisma.technicianProfile.findUnique({
+        where: { userId },
+      });
       if (!profile || request.technicianId !== profile.id) {
-        return res.status(403).json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
+        return res
+          .status(403)
+          .json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
       }
     }
 
     const comment = await prisma.requestComment.create({
-      data: { content: content.trim(), requestId: req.params.requestId, authorId: userId },
+      data: {
+        content: content.trim(),
+        requestId: req.params.requestId,
+        authorId: userId,
+      },
       include: { author: { select: { name: true, role: true } } },
     });
 
@@ -308,37 +590,46 @@ router.post("/requests/:requestId/comments", requireAuth, async (req, res) => {
 });
 
 // GET /api/requests/:requestId/attachments
-router.get("/requests/:requestId/attachments", requireAuth, async (req, res) => {
-  try {
-    const request = await prisma.maintenanceRequest.findFirst({
-      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
-    });
-    if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
+router.get(
+  "/requests/:requestId/attachments",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const request = await prisma.maintenanceRequest.findFirst({
+        where: {
+          id: req.params.requestId,
+          organizationId: req.session.organizationId!,
+        },
+      });
+      if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
 
-    const role = req.session.userRole!;
-    const userId = req.session.userId!;
-    if (role === "resident" && request.residentId !== userId) {
-      return res.status(403).json({ error: "ليس لديك صلاحية" });
+      const role = req.session.userRole!;
+      const userId = req.session.userId!;
+      if (role === "resident" && request.residentId !== userId) {
+        return res.status(403).json({ error: "ليس لديك صلاحية" });
+      }
+
+      const attachments = await prisma.requestAttachment.findMany({
+        where: { requestId: req.params.requestId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      res.json(
+        attachments.map((a) => ({
+          id: a.id,
+          fileName: a.fileName,
+          mimeType: a.mimeType,
+          sizeBytes: a.sizeBytes,
+          attachmentType: a.attachmentType,
+          url: getFileUrl(a.filePath),
+          createdAt: a.createdAt.toISOString(),
+        })),
+      );
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
     }
-
-    const attachments = await prisma.requestAttachment.findMany({
-      where: { requestId: req.params.requestId },
-      orderBy: { createdAt: "asc" },
-    });
-
-    res.json(attachments.map((a) => ({
-      id: a.id,
-      fileName: a.fileName,
-      mimeType: a.mimeType,
-      sizeBytes: a.sizeBytes,
-      attachmentType: a.attachmentType,
-      url: getFileUrl(a.filePath),
-      createdAt: a.createdAt.toISOString(),
-    })));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "خطأ في الخادم" });
-  }
-});
+  },
+);
 
 export default router;

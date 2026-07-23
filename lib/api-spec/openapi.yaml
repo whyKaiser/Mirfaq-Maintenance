@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
+  version: 0.4.0
   description: مِرفق API specification
 servers:
   - url: /api
@@ -22,6 +22,10 @@ tags:
     description: Technician profiles
   - name: dashboard
     description: Dashboard statistics
+  - name: public
+    description: Public QR maintenance reporting
+  - name: preventive
+    description: Preventive maintenance plans
 paths:
   /healthz:
     get:
@@ -265,6 +269,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /units/{id}/public-token/rotate:
+    post:
+      operationId: rotateUnitPublicToken
+      tags: [units]
+      summary: Replace a unit public QR token (manager only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token rotated and updated unit returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unit"
+        "404":
+          description: Unit not found
+
   /requests:
     get:
       operationId: getRequests
@@ -341,6 +366,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/MaintenanceRequest"
 
+  /requests/{id}/costs:
+    patch:
+      operationId: updateRequestCosts
+      tags: [requests]
+      summary: Update request labor and parts costs (manager only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestCostsInput"
+      responses:
+        "200":
+          description: Costs updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceRequest"
+        "400":
+          description: Invalid costs
+        "404":
+          description: Request not found
+
+  /requests/{id}/rating:
+    post:
+      operationId: rateRequest
+      tags: [requests]
+      summary: Rate a completed request (owning resident only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestRatingInput"
+      responses:
+        "200":
+          description: Rating saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceRequest"
+        "400":
+          description: Invalid rating
+        "404":
+          description: Request not found
+        "409":
+          description: Request incomplete or already rated
+
   /requests/{requestId}/comments:
     get:
       operationId: getRequestComments
@@ -412,6 +497,201 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardStats"
+
+  /public/units/{token}:
+    get:
+      operationId: getPublicUnit
+      tags: [public]
+      summary: Resolve a unit public QR token
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public unit details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicUnit"
+        "404":
+          description: Unit not found
+        "429":
+          description: Rate limit exceeded
+
+  /public/units/{token}/requests:
+    post:
+      operationId: createPublicRequest
+      tags: [public]
+      summary: Create a maintenance request from a unit QR page
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicRequestInput"
+      responses:
+        "201":
+          description: Request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicRequestCreated"
+        "400":
+          description: Invalid request data
+        "404":
+          description: Unit not found
+        "409":
+          description: Unit has no resident
+        "429":
+          description: Rate limit exceeded
+
+  /preventive-plans:
+    get:
+      operationId: getPreventivePlans
+      tags: [preventive]
+      summary: List preventive plans (manager or assigned technician)
+      parameters:
+        - name: propertyId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: isActive
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Preventive plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PreventivePlan"
+    post:
+      operationId: createPreventivePlan
+      tags: [preventive]
+      summary: Create a preventive plan (manager only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreventivePlanInput"
+      responses:
+        "201":
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreventivePlan"
+        "400":
+          description: Invalid plan data
+
+  /preventive-plans/{id}:
+    get:
+      operationId: getPreventivePlan
+      tags: [preventive]
+      summary: Get a preventive plan (manager or assigned technician)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Preventive plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreventivePlan"
+        "403":
+          description: Forbidden
+        "404":
+          description: Plan not found
+    patch:
+      operationId: updatePreventivePlan
+      tags: [preventive]
+      summary: Update a preventive plan (manager only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreventivePlanUpdate"
+      responses:
+        "200":
+          description: Plan updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreventivePlan"
+        "400":
+          description: Invalid plan data
+        "404":
+          description: Plan not found
+    delete:
+      operationId: deletePreventivePlan
+      tags: [preventive]
+      summary: Delete a preventive plan (manager only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Plan deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          description: Plan not found
+
+  /preventive-plans/{id}/complete:
+    post:
+      operationId: completePreventivePlan
+      tags: [preventive]
+      summary: Complete a plan cycle and schedule its next due date
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Plan cycle completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreventivePlan"
+        "403":
+          description: Forbidden
+        "404":
+          description: Plan not found
 
 components:
   schemas:
@@ -503,7 +783,7 @@ components:
 
     Unit:
       type: object
-      required: [id, number, floor, propertyId]
+      required: [id, number, floor, propertyId, publicToken]
       properties:
         id:
           type: string
@@ -513,6 +793,9 @@ components:
           type: integer
         propertyId:
           type: string
+        publicToken:
+          type: string
+          description: Opaque token used in the unit public QR URL; managers can rotate it
         residentId:
           type: ["string", "null"]
         residentName:
@@ -542,7 +825,7 @@ components:
 
     MaintenanceRequest:
       type: object
-      required: [id, title, description, category, priority, status, propertyId, unitId, residentId, createdAt, updatedAt]
+      required: [id, title, description, category, priority, status, propertyId, unitId, residentId, laborCost, partsCost, totalCost, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -568,14 +851,45 @@ components:
           type: string
         residentName:
           type: ["string", "null"]
+        reporterName:
+          type: ["string", "null"]
+          description: Name entered by a public QR reporter
+        reporterPhone:
+          type: ["string", "null"]
+          description: Phone entered by a public QR reporter
         technicianId:
           type: ["string", "null"]
         technicianName:
           type: ["string", "null"]
+        laborCost:
+          type: number
+          minimum: 0
+          maximum: 10000000
+          multipleOf: 0.01
+        partsCost:
+          type: number
+          minimum: 0
+          maximum: 10000000
+          multipleOf: 0.01
+        totalCost:
+          type: number
+          minimum: 0
+          readOnly: true
+        rating:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        ratingComment:
+          type: ["string", "null"]
+        ratedAt:
+          type: ["string", "null"]
+          format: date-time
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
 
     RequestInput:
       type: object
@@ -607,6 +921,194 @@ components:
           type: string
         description:
           type: string
+
+    RequestCostsInput:
+      type: object
+      minProperties: 1
+      properties:
+        laborCost:
+          type: number
+          minimum: 0
+          maximum: 10000000
+          multipleOf: 0.01
+        partsCost:
+          type: number
+          minimum: 0
+          maximum: 10000000
+          multipleOf: 0.01
+
+    RequestRatingInput:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+
+    PublicUnit:
+      type: object
+      required: [orgName, propertyName, unitId, unitNumber]
+      properties:
+        orgName:
+          type: string
+        propertyName:
+          type: string
+        unitId:
+          type: string
+        unitNumber:
+          type: string
+
+    PublicRequestInput:
+      type: object
+      required: [name, phone, title, description, category, priority]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        phone:
+          type: string
+          minLength: 7
+          maxLength: 25
+        title:
+          type: string
+          minLength: 3
+          maxLength: 160
+        description:
+          type: string
+          minLength: 10
+          maxLength: 3000
+        category:
+          type: string
+          enum: [كهرباء, سباكة, تكييف, أخرى]
+        priority:
+          type: string
+          enum: [عاجل, عادي]
+
+    PublicRequestCreated:
+      type: object
+      required: [id, title, status, propertyName, unitNumber, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        propertyName:
+          type: string
+        unitNumber:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PreventivePlan:
+      type: object
+      required: [id, organizationId, propertyId, propertyName, unitId, unitNumber, assignedTechnicianId, assignedTechnicianName, title, category, frequencyDays, nextDueAt, notes, isActive, lastCompletedAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        organizationId:
+          type: string
+        propertyId:
+          type: string
+        propertyName:
+          type: ["string", "null"]
+        unitId:
+          type: ["string", "null"]
+        unitNumber:
+          type: ["string", "null"]
+        assignedTechnicianId:
+          type: ["string", "null"]
+        assignedTechnicianName:
+          type: ["string", "null"]
+        title:
+          type: string
+        category:
+          type: string
+        frequencyDays:
+          type: integer
+          minimum: 1
+          maximum: 3650
+        nextDueAt:
+          type: string
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        lastCompletedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PreventivePlanInput:
+      type: object
+      required: [propertyId, title, category, frequencyDays, nextDueAt]
+      properties:
+        propertyId:
+          type: string
+        unitId:
+          type: ["string", "null"]
+        assignedTechnicianId:
+          type: ["string", "null"]
+        title:
+          type: string
+          minLength: 2
+          maxLength: 160
+        category:
+          type: string
+          minLength: 2
+        frequencyDays:
+          type: integer
+          minimum: 1
+          maximum: 3650
+        nextDueAt:
+          type: string
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    PreventivePlanUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        propertyId:
+          type: string
+        unitId:
+          type: ["string", "null"]
+        assignedTechnicianId:
+          type: ["string", "null"]
+        title:
+          type: string
+          minLength: 2
+          maxLength: 160
+        category:
+          type: string
+          minLength: 2
+        frequencyDays:
+          type: integer
+          minimum: 1
+          maximum: 3650
+        nextDueAt:
+          type: string
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
 
     Comment:
       type: object

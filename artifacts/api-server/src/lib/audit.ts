@@ -19,7 +19,14 @@ export type AuditAction =
   | "activate_user"
   | "deactivate_user"
   | "upload_attachment"
-  | "update_settings";
+  | "update_settings"
+  | "update_request_costs"
+  | "rate_request"
+  | "create_preventive_plan"
+  | "delete_preventive_plan"
+  | "complete_preventive_plan"
+  | "update_preventive_plan"
+  | "rotate_unit_public_token";
 
 export interface LogActionParams {
   organizationId: string;
@@ -52,17 +59,24 @@ export async function logAction(params: LogActionParams): Promise<void> {
 }
 
 export const ACTION_LABELS: Record<AuditAction, string> = {
-  create_request:    "إنشاء بلاغ",
-  change_status:     "تغيير الحالة",
-  change_priority:   "تغيير الأولوية",
+  create_request: "إنشاء بلاغ",
+  change_status: "تغيير الحالة",
+  change_priority: "تغيير الأولوية",
   assign_technician: "تعيين فني",
-  create_property:   "إضافة عقار",
-  delete_property:   "حذف عقار",
-  create_unit:       "إضافة وحدة",
-  delete_unit:       "حذف وحدة",
-  create_user:       "إنشاء مستخدم",
-  activate_user:     "تفعيل مستخدم",
-  deactivate_user:   "تعطيل مستخدم",
+  create_property: "إضافة عقار",
+  delete_property: "حذف عقار",
+  create_unit: "إضافة وحدة",
+  delete_unit: "حذف وحدة",
+  create_user: "إنشاء مستخدم",
+  activate_user: "تفعيل مستخدم",
+  deactivate_user: "تعطيل مستخدم",
   upload_attachment: "رفع مرفق",
-  update_settings:   "تحديث إعدادات الشركة",
+  update_settings: "تحديث إعدادات الشركة",
+  update_request_costs: "تحديث تكاليف البلاغ",
+  rate_request: "تقييم البلاغ",
+  create_preventive_plan: "إنشاء خطة صيانة وقائية",
+  delete_preventive_plan: "حذف خطة صيانة وقائية",
+  complete_preventive_plan: "إكمال صيانة وقائية",
+  update_preventive_plan: "تحديث خطة صيانة وقائية",
+  rotate_unit_public_token: "تدوير رمز بلاغ الوحدة",
 };

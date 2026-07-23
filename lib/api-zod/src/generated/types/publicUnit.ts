@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.4.0
  */
 
-export interface PropertyUpdate {
-  name?: string;
-  address?: string;
+export interface PublicUnit {
+  orgName: string;
+  propertyName: string;
+  unitId: string;
+  unitNumber: string;
 }

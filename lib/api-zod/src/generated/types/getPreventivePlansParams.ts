@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.4.0
  */
 
-export interface PropertyUpdate {
-  name?: string;
-  address?: string;
-}
+export type GetPreventivePlansParams = {
+propertyId?: string;
+isActive?: boolean;
+};

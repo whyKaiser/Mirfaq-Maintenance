@@ -13,6 +13,8 @@ import attachmentsRouter from "./attachments";
 import auditLogRouter from "./audit-log";
 import reportsRouter from "./reports";
 import leadsRouter from "./leads";
+import publicUnitsRouter from "./public-units";
+import preventivePlansRouter from "./preventive-plans";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use(attachmentsRouter);
 router.use(auditLogRouter);
 router.use(reportsRouter);
 router.use(leadsRouter);
+router.use(publicUnitsRouter);
+router.use(preventivePlansRouter);
 
 export default router;

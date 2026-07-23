@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { Plus, X, Clock, RefreshCcw, CheckCircle2, LogOut, Send, MessageSquare, Paperclip, Upload, Trash2, Image } from 'lucide-react';
+import { Plus, X, Clock, RefreshCcw, CheckCircle2, LogOut, Send, MessageSquare, Paperclip, Upload, Trash2, Image, Star } from 'lucide-react';
 import {
   useGetRequests,
   useCreateRequest,
@@ -87,8 +87,129 @@ function CommentsPanel({ requestId }: { requestId: string }) {
   );
 }
 
+type RatedMaintenanceRequest = MaintenanceRequest & {
+  rating?: number | null;
+  ratingComment?: string | null;
+};
+
+function RatingPanel({ request }: { request: RatedMaintenanceRequest }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const qc = useQueryClient();
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (rating < 1 || rating > 5 || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/requests/${request.id}/rating`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, comment: comment.trim() || undefined }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+        throw new Error(body?.error ?? body?.message ?? 'تعذر حفظ التقييم');
+      }
+      setIsSubmitted(true);
+      qc.invalidateQueries({ queryKey: getGetRequestsQueryKey() });
+    } catch (submitError: unknown) {
+      setError(submitError instanceof Error ? submitError.message : 'تعذر حفظ التقييم');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (request.rating) {
+    return (
+      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-amber-900">تقييمك للخدمة</p>
+          <div className="flex gap-0.5" dir="ltr" aria-label={`${request.rating} من 5`}>
+            {[1, 2, 3, 4, 5].map(value => (
+              <Star
+                key={value}
+                className={`h-4 w-4 ${value <= request.rating! ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`}
+              />
+            ))}
+          </div>
+        </div>
+        {request.ratingComment && (
+          <p className="mt-2 text-xs leading-5 text-amber-800">{request.ratingComment}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
+        شكراً! تم حفظ تقييمك.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-bold">كيف كانت خدمة الصيانة؟</p>
+          <p className="text-xs text-muted-foreground">تقييمك يساعدنا نحسّن الخدمة.</p>
+        </div>
+        <div className="mt-2 flex w-fit gap-1 sm:mt-0" dir="ltr" role="radiogroup" aria-label="اختر التقييم من 5">
+          {[1, 2, 3, 4, 5].map(value => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={rating === value}
+              aria-label={`${value} من 5`}
+              onClick={() => setRating(value)}
+              className="rounded-lg p-1.5 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+            >
+              <Star
+                className={`h-6 w-6 transition ${
+                  value <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/35'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <textarea
+        value={comment}
+        onChange={event => setComment(event.target.value)}
+        rows={2}
+        maxLength={500}
+        placeholder="اكتب ملاحظتك (اختياري)"
+        className="mt-3 w-full resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-xs leading-5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+      />
+
+      {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={rating === 0 || isSubmitting}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isSubmitting && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />}
+        {rating === 0 ? 'اختر عدد النجوم أولاً' : isSubmitting ? 'جاري حفظ التقييم...' : 'إرسال التقييم'}
+      </button>
+    </form>
+  );
+}
+
 function RequestCard({ req }: { req: MaintenanceRequest }) {
   const [expanded, setExpanded] = useState(false);
+  const ratedRequest = req as RatedMaintenanceRequest;
   const info = STATUS_STYLES[req.status] ?? { label: req.status, style: 'bg-muted text-muted-foreground border-border', icon: null };
 
   return (
@@ -107,6 +228,12 @@ function RequestCard({ req }: { req: MaintenanceRequest }) {
                 <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 border border-red-200 font-medium">عاجل</span>
               )}
               <span className="text-xs text-muted-foreground">{req.category}</span>
+              {req.status === 'مكتملة' && !ratedRequest.rating && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <Star className="h-3 w-3" />
+                  بانتظار تقييمك
+                </span>
+              )}
             </div>
             <p className="text-sm font-semibold">{req.title}</p>
             {req.technicianName && (
@@ -122,6 +249,7 @@ function RequestCard({ req }: { req: MaintenanceRequest }) {
       {expanded && (
         <div className="px-4 pb-4 border-t border-border/50 pt-3">
           <p className="text-sm text-muted-foreground leading-relaxed">{req.description}</p>
+          {req.status === 'مكتملة' && <RatingPanel request={ratedRequest} />}
           <CommentsPanel requestId={req.id} />
         </div>
       )}
