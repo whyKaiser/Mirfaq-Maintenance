@@ -7,7 +7,8 @@ import {
   Building2, Home, Plus, Pencil, Trash2, X, AlertTriangle,
   Eye, EyeOff, Copy, Check, Shield, ClipboardList,
   Printer, UserCheck, UserX, Palette, Phone,
-  QrCode, Download,
+  QrCode, Download, CalendarCheck2, CircleDollarSign,
+  Star,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import {
@@ -71,7 +72,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'technicians' | 'users' | 'audit' | 'settings';
+type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'preventive' | 'technicians' | 'users' | 'audit' | 'settings';
 
 interface ResidentUser {
   id: string;
@@ -81,17 +82,46 @@ interface ResidentUser {
   unitNumber: string | null;
 }
 
+interface PreventivePlan {
+  id: string;
+  propertyId: string;
+  propertyName?: string | null;
+  unitId?: string | null;
+  unitNumber?: string | null;
+  assignedTechnicianId?: string | null;
+  assignedTechnicianName?: string | null;
+  technicianName?: string | null;
+  title: string;
+  category: string;
+  frequencyDays: number;
+  nextDueAt: string;
+  notes?: string | null;
+  isActive: boolean;
+  lastCompletedAt?: string | null;
+}
+
 function UnitQrModal({
   unit,
   propertyName,
   onClose,
+  onTokenRotated,
 }: {
   unit: Unit;
   propertyName: string;
   onClose: () => void;
+  onTokenRotated: (unit: Unit) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const reportUrl = `${window.location.origin}${import.meta.env.BASE_URL}login?unit=${encodeURIComponent(unit.id)}`;
+  const [isRotating, setIsRotating] = useState(false);
+  const [confirmRotation, setConfirmRotation] = useState(false);
+  const [rotationError, setRotationError] = useState('');
+  const publicToken = unit.publicToken;
+  const basePath = import.meta.env.BASE_URL.endsWith('/')
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`;
+  const reportUrl = publicToken
+    ? `${window.location.origin}${basePath}report/${encodeURIComponent(publicToken)}`
+    : null;
 
   function downloadQr() {
     const canvas = canvasRef.current?.querySelector('canvas');
@@ -100,6 +130,33 @@ function UnitQrModal({
     link.download = `mirfaq-${propertyName}-${unit.number}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+  }
+
+  async function rotateToken() {
+    if (isRotating) return;
+    setIsRotating(true);
+    setRotationError('');
+    try {
+      const response = await fetch(
+        `/api/units/${encodeURIComponent(unit.id)}/public-token/rotate`,
+        {
+          method: 'POST',
+          credentials: 'include',
+        },
+      );
+      const payload = await response.json().catch(() => null) as
+        | (Partial<Unit> & { publicToken?: string; error?: string })
+        | null;
+      if (!response.ok || !payload?.publicToken) {
+        throw new Error(payload?.error || 'تعذّر تجديد رمز QR');
+      }
+      onTokenRotated({ ...unit, ...payload } as Unit);
+      setConfirmRotation(false);
+    } catch (error) {
+      setRotationError(error instanceof Error ? error.message : 'تعذّر تجديد رمز QR');
+    } finally {
+      setIsRotating(false);
+    }
   }
 
   return (
@@ -112,13 +169,59 @@ function UnitQrModal({
           </div>
           <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="إغلاق"><X className="h-5 w-5" /></button>
         </div>
-        <div ref={canvasRef} className="mx-auto inline-flex rounded-2xl border bg-white p-5">
-          <QRCodeCanvas value={reportUrl} size={220} level="H" marginSize={1} />
-        </div>
-        <p className="mt-4 text-sm leading-6 text-muted-foreground">نزّل الرمز وضعه داخل الوحدة. يمسحه الساكن ثم يسجل الدخول ويرفع البلاغ.</p>
-        <button onClick={downloadQr} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground">
-          <Download className="h-4 w-4" /> تنزيل PNG
-        </button>
+        {reportUrl ? (
+          <>
+            <div ref={canvasRef} className="mx-auto inline-flex rounded-2xl border bg-white p-5">
+              <QRCodeCanvas value={reportUrl} size={220} level="H" marginSize={1} />
+            </div>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              نزّل الرمز وضعه داخل الوحدة. يفتح صفحة بلاغ عامة وآمنة بدون تسجيل دخول.
+            </p>
+            <button onClick={downloadQr} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground">
+              <Download className="h-4 w-4" /> تنزيل PNG
+            </button>
+            {confirmRotation ? (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-right">
+                <p className="text-xs leading-5 text-amber-900">
+                  الرمز الحالي سيتوقف فورًا. نزّل الرمز الجديد واستبدل الملصق القديم.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={rotateToken}
+                    disabled={isRotating}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                  >
+                    <RefreshCcw className={`h-3.5 w-3.5 ${isRotating ? 'animate-spin' : ''}`} />
+                    {isRotating ? 'جارٍ التجديد…' : 'نعم، جدّد الرمز'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRotation(false)}
+                    disabled={isRotating}
+                    className="rounded-xl border border-amber-300 px-3 py-2 text-xs font-medium text-amber-900 disabled:opacity-60"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setConfirmRotation(true); setRotationError(''); }}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                تجديد الرمز
+              </button>
+            )}
+            {rotationError && <p className="mt-2 text-xs text-destructive">{rotationError}</p>}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+            رمز البلاغ العام غير متاح لهذه الوحدة بعد. حدّث الصفحة بعد ترقية قاعدة البيانات.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -344,13 +447,55 @@ function RequestDetailModal({
   onClose: () => void;
   onUpdate: (id: string, data: { status?: string; priority?: string; technicianId?: string | null }) => void;
 }) {
+  const qc = useQueryClient();
+  const requestWithCosts = request as MaintenanceRequest & {
+    laborCost?: number | null;
+    partsCost?: number | null;
+  };
   const [status, setStatus] = useState(request.status);
   const [priority, setPriority] = useState(request.priority);
   const [technicianId, setTechnicianId] = useState(request.technicianId ?? '');
+  const [laborCost, setLaborCost] = useState(String(requestWithCosts.laborCost ?? 0));
+  const [partsCost, setPartsCost] = useState(String(requestWithCosts.partsCost ?? 0));
+  const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [costError, setCostError] = useState('');
+  const [costSaved, setCostSaved] = useState(false);
+  const laborValue = Number(laborCost || 0);
+  const partsValue = Number(partsCost || 0);
+  const totalCost = (Number.isFinite(laborValue) ? laborValue : 0) + (Number.isFinite(partsValue) ? partsValue : 0);
+
+  async function saveCosts() {
+    if (!Number.isFinite(laborValue) || !Number.isFinite(partsValue) || laborValue < 0 || partsValue < 0) {
+      setCostError('أدخل تكاليف صحيحة وغير سالبة');
+      return;
+    }
+
+    setIsSavingCosts(true);
+    setCostError('');
+    setCostSaved(false);
+    try {
+      const response = await fetch(`/api/requests/${encodeURIComponent(request.id)}/costs`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ laborCost: laborValue, partsCost: partsValue }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || 'تعذّر حفظ التكاليف');
+      }
+      await qc.invalidateQueries({ queryKey: getGetRequestsQueryKey() });
+      setCostSaved(true);
+    } catch (error) {
+      setCostError(error instanceof Error ? error.message : 'تعذّر حفظ التكاليف');
+    } finally {
+      setIsSavingCosts(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
+      <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
           <h2 className="font-bold text-lg">تفاصيل البلاغ</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
@@ -402,6 +547,53 @@ function RequestDetailModal({
                 <option key={t.id} value={t.id}>{t.name} ({t.specialty})</option>
               ))}
             </select>
+          </div>
+          <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <CircleDollarSign className="h-4 w-4 text-primary" />
+              <h4 className="text-sm font-semibold">تكلفة الصيانة</h4>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium">أجور العمالة (ر.س)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={laborCost}
+                  onChange={event => { setLaborCost(event.target.value); setCostSaved(false); }}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="font-medium">قطع الغيار (ر.س)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={partsCost}
+                  onChange={event => { setPartsCost(event.target.value); setCostSaved(false); }}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+            </div>
+            <div className="flex flex-col gap-3 rounded-xl bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm">
+                الإجمالي: <strong className="text-base">{totalCost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} ر.س</strong>
+              </p>
+              <button
+                type="button"
+                onClick={saveCosts}
+                disabled={isSavingCosts}
+                className="rounded-xl border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"
+              >
+                {isSavingCosts ? 'جارٍ الحفظ…' : 'حفظ التكاليف'}
+              </button>
+            </div>
+            {costError && <p className="text-xs text-destructive">{costError}</p>}
+            {costSaved && <p className="text-xs text-emerald-700">تم حفظ التكاليف</p>}
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-border">
@@ -1220,6 +1412,13 @@ function UnitsView() {
           unit={qrUnit}
           propertyName={activeProp?.name ?? 'العقار'}
           onClose={() => setQrUnit(null)}
+          onTokenRotated={updatedUnit => {
+            setQrUnit(updatedUnit);
+            qc.setQueryData<Unit[]>(
+              getGetUnitsQueryKey(activePropId),
+              current => current?.map(unit => unit.id === updatedUnit.id ? updatedUnit : unit),
+            );
+          }}
         />
       )}
     </div>
@@ -1335,6 +1534,389 @@ function RequestsView({
   );
 }
 
+// ─── preventive maintenance view ──────────────────────────────────────────────
+
+function dueState(plan: PreventivePlan) {
+  if (!plan.isActive) {
+    return { label: 'متوقفة', className: 'border-slate-200 bg-slate-100 text-slate-700' };
+  }
+
+  const due = new Date(plan.nextDueAt);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const days = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
+
+  if (days <= 0) {
+    return { label: days < 0 ? `متأخرة ${Math.abs(days)} يوم` : 'مستحقة اليوم', className: 'border-red-200 bg-red-100 text-red-800' };
+  }
+  if (days <= 7) {
+    return { label: `قريبة خلال ${days} يوم`, className: 'border-amber-200 bg-amber-100 text-amber-800' };
+  }
+  return { label: `لاحقة بعد ${days} يوم`, className: 'border-emerald-200 bg-emerald-100 text-emerald-800' };
+}
+
+function PreventiveMaintenanceView({ technicians }: { technicians: TechnicianProfile[] }) {
+  const qc = useQueryClient();
+  const { data: properties = [], isLoading: propertiesLoading } = useGetProperties();
+  const [showForm, setShowForm] = useState(false);
+  const [propertyId, setPropertyId] = useState('');
+  const [unitId, setUnitId] = useState('');
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('تكييف');
+  const [frequencyDays, setFrequencyDays] = useState('90');
+  const [nextDueAt, setNextDueAt] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().slice(0, 10);
+  });
+  const [assignedTechnicianId, setAssignedTechnicianId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingAction, setPendingAction] = useState('');
+  const [planToDelete, setPlanToDelete] = useState<PreventivePlan | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!propertyId && properties[0]?.id) setPropertyId(properties[0].id);
+  }, [properties, propertyId]);
+
+  const plansQuery = useQuery<PreventivePlan[]>({
+    queryKey: ['preventive-plans'],
+    queryFn: async () => {
+      const response = await fetch('/api/preventive-plans', { credentials: 'include' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload as { error?: string } | null)?.error || 'تعذّر تحميل خطط الصيانة');
+      return payload as PreventivePlan[];
+    },
+  });
+
+  const unitsQuery = useQuery<Unit[]>({
+    queryKey: ['preventive-plan-units', propertyId],
+    enabled: !!propertyId,
+    queryFn: async () => {
+      const response = await fetch(`/api/properties/${encodeURIComponent(propertyId)}/units`, { credentials: 'include' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload as { error?: string } | null)?.error || 'تعذّر تحميل الوحدات');
+      return payload as Unit[];
+    },
+  });
+
+  async function submitPlan(event: React.FormEvent) {
+    event.preventDefault();
+    const interval = Number(frequencyDays);
+    if (!propertyId || !title.trim() || !Number.isInteger(interval) || interval < 1 || !nextDueAt) {
+      setError('أكمل الحقول المطلوبة بقيم صحيحة');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/preventive-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          propertyId,
+          unitId: unitId || undefined,
+          title: title.trim(),
+          category,
+          frequencyDays: interval,
+          nextDueAt: new Date(`${nextDueAt}T12:00:00`).toISOString(),
+          assignedTechnicianId: assignedTechnicianId || undefined,
+          notes: notes.trim() || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload as { error?: string } | null)?.error || 'تعذّر إنشاء الخطة');
+      await qc.invalidateQueries({ queryKey: ['preventive-plans'] });
+      setTitle('');
+      setUnitId('');
+      setAssignedTechnicianId('');
+      setNotes('');
+      setShowForm(false);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'تعذّر إنشاء الخطة');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function updatePlan(
+    plan: PreventivePlan,
+    action: 'complete' | 'toggle' | 'delete',
+  ) {
+    const actionKey = `${action}:${plan.id}`;
+    setPendingAction(actionKey);
+    setError('');
+    try {
+      const path = action === 'complete'
+        ? `/api/preventive-plans/${encodeURIComponent(plan.id)}/complete`
+        : `/api/preventive-plans/${encodeURIComponent(plan.id)}`;
+      const response = await fetch(path, {
+        method: action === 'delete' ? 'DELETE' : action === 'complete' ? 'POST' : 'PATCH',
+        headers: action === 'toggle' ? { 'Content-Type': 'application/json' } : undefined,
+        credentials: 'include',
+        body: action === 'toggle' ? JSON.stringify({ isActive: !plan.isActive }) : undefined,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error((payload as { error?: string } | null)?.error || 'تعذّر تنفيذ العملية');
+      await qc.invalidateQueries({ queryKey: ['preventive-plans'] });
+      if (action === 'delete') setPlanToDelete(null);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'تعذّر تنفيذ العملية');
+    } finally {
+      setPendingAction('');
+    }
+  }
+
+  const plans = plansQuery.data ?? [];
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-300">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">الصيانة الوقائية</h1>
+          <p className="mt-1 text-sm text-muted-foreground">جدولة الأعمال الدورية قبل حدوث الأعطال</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => plansQuery.refetch()}
+            disabled={plansQuery.isFetching}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60"
+          >
+            <RefreshCcw className={`h-4 w-4 ${plansQuery.isFetching ? 'animate-spin' : ''}`} />
+            تحديث
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowForm(current => !current); setError(''); }}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground sm:flex-none"
+          >
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? 'إغلاق النموذج' : 'خطة جديدة'}
+          </button>
+        </div>
+      </div>
+
+      {showForm && (
+        <form onSubmit={submitPlan} className="space-y-4 rounded-2xl border border-border bg-card p-4 md:p-5">
+          <div className="flex items-center gap-2">
+            <CalendarCheck2 className="h-5 w-5 text-primary" />
+            <h2 className="font-semibold">إضافة خطة دورية</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">اسم المهمة *</span>
+              <input
+                value={title}
+                onChange={event => setTitle(event.target.value)}
+                placeholder="مثال: تنظيف فلاتر المكيفات"
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                required
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">التصنيف *</span>
+              <select
+                value={category}
+                onChange={event => setCategory(event.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {['تكييف', 'كهرباء', 'سباكة', 'مصاعد', 'سلامة', 'نظافة', 'أخرى'].map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">العقار *</span>
+              <select
+                value={propertyId}
+                onChange={event => { setPropertyId(event.target.value); setUnitId(''); }}
+                disabled={propertiesLoading}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                required
+              >
+                <option value="">اختر العقار</option>
+                {properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">الوحدة (اختياري)</span>
+              <select
+                value={unitId}
+                onChange={event => setUnitId(event.target.value)}
+                disabled={!propertyId || unitsQuery.isLoading}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              >
+                <option value="">كل العقار</option>
+                {(unitsQuery.data ?? []).map(unit => <option key={unit.id} value={unit.id}>وحدة {unit.number}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">التكرار كل كم يوم؟ *</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={frequencyDays}
+                onChange={event => setFrequencyDays(event.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                required
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium">موعد التنفيذ القادم *</span>
+              <input
+                type="date"
+                value={nextDueAt}
+                onChange={event => setNextDueAt(event.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                required
+              />
+            </label>
+            <label className="space-y-1.5 text-sm md:col-span-2">
+              <span className="font-medium">الفني المكلف (اختياري)</span>
+              <select
+                value={assignedTechnicianId}
+                onChange={event => setAssignedTechnicianId(event.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">بدون تعيين</option>
+                {technicians.map(technician => (
+                  <option key={technician.id} value={technician.id}>{technician.name} ({technician.specialty})</option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-sm md:col-span-2">
+              <span className="font-medium">ملاحظات</span>
+              <textarea
+                value={notes}
+                onChange={event => setNotes(event.target.value)}
+                rows={3}
+                placeholder="تعليمات التنفيذ أو المواد المطلوبة"
+                className="w-full resize-none rounded-xl border border-input bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <button
+            type="submit"
+            disabled={isSubmitting || properties.length === 0}
+            className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60 sm:w-auto"
+          >
+            {isSubmitting ? 'جارٍ الإنشاء…' : 'حفظ الخطة'}
+          </button>
+        </form>
+      )}
+
+      {!showForm && error && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>
+      )}
+
+      {plansQuery.isLoading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {[1, 2, 3, 4].map(item => <div key={item} className="h-48 animate-pulse rounded-2xl border border-border bg-card" />)}
+        </div>
+      ) : plansQuery.isError ? (
+        <div className="rounded-2xl border border-destructive/30 bg-card p-8 text-center text-sm text-destructive">
+          {plansQuery.error instanceof Error ? plansQuery.error.message : 'تعذّر تحميل خطط الصيانة'}
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-card py-14 text-center text-muted-foreground">
+          <CalendarCheck2 className="mx-auto mb-3 h-10 w-10 opacity-30" />
+          <p className="font-medium">لا توجد خطط صيانة وقائية</p>
+          <p className="mt-1 text-sm">أنشئ أول خطة لمتابعة الأعمال الدورية.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {plans.map(plan => {
+            const state = dueState(plan);
+            const technicianName = plan.assignedTechnicianName ?? plan.technicianName;
+            return (
+              <article key={plan.id} className={`rounded-2xl border border-border bg-card p-4 md:p-5 ${plan.isActive ? '' : 'opacity-70'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${state.className}`}>{state.label}</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{plan.category}</span>
+                    </div>
+                    <h2 className="font-semibold">{plan.title}</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {plan.propertyName ?? 'العقار'}
+                      {plan.unitNumber ? ` · وحدة ${plan.unitNumber}` : ' · كامل العقار'}
+                    </p>
+                  </div>
+                  <CalendarCheck2 className="h-5 w-5 shrink-0 text-primary" />
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-muted/30 p-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">الموعد القادم</p>
+                    <p className="mt-0.5 font-medium">{new Date(plan.nextDueAt).toLocaleDateString('ar-SA')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">التكرار</p>
+                    <p className="mt-0.5 font-medium">كل {plan.frequencyDays} يوم</p>
+                  </div>
+                  {technicianName && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">الفني</p>
+                      <p className="mt-0.5 font-medium">{technicianName}</p>
+                    </div>
+                  )}
+                </div>
+                {plan.notes && <p className="mt-3 text-sm leading-6 text-muted-foreground">{plan.notes}</p>}
+
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                  {plan.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => updatePlan(plan, 'complete')}
+                      disabled={!!pendingAction}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      {pendingAction === `complete:${plan.id}` ? 'جارٍ الإتمام…' : 'تسجيل الإتمام'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => updatePlan(plan, 'toggle')}
+                    disabled={!!pendingAction}
+                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
+                  >
+                    {pendingAction === `toggle:${plan.id}` ? 'جارٍ…' : plan.isActive ? 'تعطيل' : 'تفعيل'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlanToDelete(plan)}
+                    disabled={!!pendingAction}
+                    aria-label={`حذف ${plan.title}`}
+                    className="rounded-xl border border-destructive/30 p-2 text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {planToDelete && (
+        <ConfirmDialog
+          message={`هل أنت متأكد من حذف خطة "${planToDelete.title}"؟`}
+          onConfirm={() => updatePlan(planToDelete, 'delete')}
+          onCancel={() => setPlanToDelete(null)}
+          isPending={pendingAction === `delete:${planToDelete.id}`}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── main manager content ──────────────────────────────────────────────────────
 
 function ManagerContent() {
@@ -1347,6 +1929,68 @@ function ManagerContent() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: requests = [], isLoading: reqLoading, refetch: refetchReq } = useGetRequests();
   const { data: technicians = [], isLoading: techLoading } = useGetTechnicians();
+  const {
+    data: dashboardPreventivePlans = [],
+    isLoading: dashboardPlansLoading,
+    isError: dashboardPlansError,
+  } = useQuery<PreventivePlan[]>({
+    queryKey: ['preventive-plans', { isActive: true }],
+    enabled: activeNav === 'dashboard',
+    queryFn: async () => {
+      const response = await fetch('/api/preventive-plans?isActive=true', { credentials: 'include' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error((payload as { error?: string } | null)?.error || 'تعذّر تحميل خطط الصيانة');
+      }
+      return payload as PreventivePlan[];
+    },
+  });
+
+  const totalLaborCost = requests.reduce((sum, request) => {
+    const value = Number(request.laborCost);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  const totalPartsCost = requests.reduce((sum, request) => {
+    const value = Number(request.partsCost);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  const totalMaintenanceCost = requests.reduce((sum, request) => {
+    const total = Number(request.totalCost);
+    if (Number.isFinite(total)) return sum + total;
+    const labor = Number(request.laborCost);
+    const parts = Number(request.partsCost);
+    return sum
+      + (Number.isFinite(labor) ? labor : 0)
+      + (Number.isFinite(parts) ? parts : 0);
+  }, 0);
+  const ratingSummary = requests.reduce(
+    (summary, request) => {
+      const rating = Number(request.rating);
+      if (Number.isFinite(rating) && rating >= 1 && rating <= 5) {
+        summary.total += rating;
+        summary.count += 1;
+      }
+      return summary;
+    },
+    { total: 0, count: 0 },
+  );
+  const averageRating = ratingSummary.count > 0
+    ? ratingSummary.total / ratingSummary.count
+    : 0;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const sevenDaysFromNow = new Date(startOfToday);
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+  sevenDaysFromNow.setHours(23, 59, 59, 999);
+  const dashboardDuePlans = dashboardPreventivePlans.filter((plan) => {
+    if (!plan.isActive) return false;
+    const dueAt = new Date(plan.nextDueAt);
+    return !Number.isNaN(dueAt.getTime()) && dueAt <= sevenDaysFromNow;
+  });
+  const dashboardOverduePlans = dashboardDuePlans.filter(
+    (plan) => new Date(plan.nextDueAt) < startOfToday,
+  );
+  const dashboardUpcomingPlans = dashboardDuePlans.length - dashboardOverduePlans.length;
 
   const { mutate: updateRequest, isPending: isUpdating } = useUpdateRequest({
     mutation: {
@@ -1372,6 +2016,7 @@ function ManagerContent() {
     { id: 'properties',  label: 'العقارات',        icon: Building2 },
     { id: 'units',       label: 'الوحدات',         icon: Home },
     { id: 'requests',    label: 'البلاغات',        icon: Wrench },
+    { id: 'preventive',  label: 'الصيانة الوقائية', icon: CalendarCheck2 },
     { id: 'technicians', label: 'الفنيون',         icon: Users },
     { id: 'users',       label: 'المستخدمون',      icon: Shield },
     { id: 'audit',       label: 'سجل العمليات',    icon: ClipboardList },
@@ -1512,6 +2157,86 @@ function ManagerContent() {
               </div>
             </div>
 
+            {/* Business insights */}
+            <section aria-labelledby="business-insights-title" className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 id="business-insights-title" className="font-semibold">مؤشرات التشغيل</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">التكلفة، رضا السكان، والاستحقاقات القريبة</p>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">محدّثة الآن</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">إجمالي تكاليف الصيانة</p>
+                      <p className="mt-1 text-2xl font-bold tracking-tight">
+                        {reqLoading
+                          ? '—'
+                          : totalMaintenanceCost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })}
+                        {!reqLoading && <span className="mr-1 text-sm font-semibold text-muted-foreground">ر.س</span>}
+                      </p>
+                    </div>
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                      <CircleDollarSign className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                    <span>عمالة: {totalLaborCost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} ر.س</span>
+                    <span>قطع: {totalPartsCost.toLocaleString('ar-SA', { maximumFractionDigits: 2 })} ر.س</span>
+                  </div>
+                </article>
+
+                <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">متوسط رضا السكان</p>
+                      <p className="mt-1 flex items-baseline gap-1 text-2xl font-bold tracking-tight">
+                        {reqLoading ? '—' : ratingSummary.count > 0 ? averageRating.toFixed(1) : 'لا يوجد'}
+                        {!reqLoading && ratingSummary.count > 0 && <span className="text-sm font-semibold text-muted-foreground">/ 5</span>}
+                      </p>
+                    </div>
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                      <Star className="h-5 w-5 fill-current" />
+                    </div>
+                  </div>
+                  <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                    {reqLoading
+                      ? 'جارٍ حساب التقييمات…'
+                      : ratingSummary.count > 0
+                        ? `بناءً على ${ratingSummary.count.toLocaleString('ar-SA')} تقييم`
+                        : 'لم تُسجّل تقييمات بعد'}
+                  </p>
+                </article>
+
+                <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">استحقاقات الصيانة خلال 7 أيام</p>
+                      <p className="mt-1 text-2xl font-bold tracking-tight">
+                        {dashboardPlansLoading || dashboardPlansError
+                          ? '—'
+                          : dashboardDuePlans.length.toLocaleString('ar-SA')}
+                        {!dashboardPlansLoading && !dashboardPlansError && <span className="mr-1 text-sm font-semibold text-muted-foreground">خطة</span>}
+                      </p>
+                    </div>
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                      <CalendarCheck2 className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                    {dashboardPlansLoading
+                      ? 'جارٍ تحميل الخطط…'
+                      : dashboardPlansError
+                        ? 'تعذّر تحميل خطط الصيانة'
+                        : `${dashboardOverduePlans.length.toLocaleString('ar-SA')} متأخرة · ${dashboardUpcomingPlans.toLocaleString('ar-SA')} قادمة`}
+                  </p>
+                </article>
+              </div>
+            </section>
+
             {/* Recent requests */}
             <div className="bg-card border border-border rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b border-border">
@@ -1565,6 +2290,9 @@ function ManagerContent() {
             refetchReq={refetchReq}
           />
         )}
+
+        {/* ── Preventive maintenance ── */}
+        {activeNav === 'preventive' && <PreventiveMaintenanceView technicians={technicians} />}
 
         {/* ── Users ── */}
         {activeNav === 'users' && <UsersView />}

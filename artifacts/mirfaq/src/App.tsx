@@ -12,6 +12,7 @@ import ResidentDashboard from '@/pages/resident';
 import TechnicianDashboard from '@/pages/technician';
 import PrintWorkOrder from '@/pages/print-work-order';
 import PrintMonthly from '@/pages/print-monthly';
+import PublicReportPage from '@/pages/public-report';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ function Router() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/report/:token" component={PublicReportPage} />
       <Route path="/manager" component={ManagerDashboard} />
       <Route path="/resident" component={ResidentDashboard} />
       <Route path="/technician" component={TechnicianDashboard} />

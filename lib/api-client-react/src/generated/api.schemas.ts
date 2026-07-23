@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * مِرفق API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.4.0
  */
 export interface HealthStatus {
   status: string;
@@ -60,6 +60,8 @@ export interface Unit {
   number: string;
   floor: number;
   propertyId: string;
+  /** Opaque token used in the unit public QR URL; managers can rotate it */
+  publicToken: string;
   /** @nullable */
   residentId?: string | null;
   /** @nullable */
@@ -97,10 +99,42 @@ export interface MaintenanceRequest {
   residentId: string;
   /** @nullable */
   residentName?: string | null;
+  /**
+     * Name entered by a public QR reporter
+     * @nullable
+     */
+  reporterName?: string | null;
+  /**
+     * Phone entered by a public QR reporter
+     * @nullable
+     */
+  reporterPhone?: string | null;
   /** @nullable */
   technicianId?: string | null;
   /** @nullable */
   technicianName?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  laborCost: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  partsCost: number;
+  /** @minimum 0 */
+  readonly totalCost: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  /** @nullable */
+  ratingComment?: string | null;
+  /** @nullable */
+  ratedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,6 +156,167 @@ export interface RequestUpdate {
   technicianId?: string | null;
   title?: string;
   description?: string;
+}
+
+export interface RequestCostsInput {
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  laborCost?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  partsCost?: number;
+}
+
+export interface RequestRatingInput {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /** @maxLength 1000 */
+  comment?: string;
+}
+
+export interface PublicUnit {
+  orgName: string;
+  propertyName: string;
+  unitId: string;
+  unitNumber: string;
+}
+
+export type PublicRequestInputCategory = typeof PublicRequestInputCategory[keyof typeof PublicRequestInputCategory];
+
+
+export const PublicRequestInputCategory = {
+  كهرباء: 'كهرباء',
+  سباكة: 'سباكة',
+  تكييف: 'تكييف',
+  أخرى: 'أخرى',
+} as const;
+
+export type PublicRequestInputPriority = typeof PublicRequestInputPriority[keyof typeof PublicRequestInputPriority];
+
+
+export const PublicRequestInputPriority = {
+  عاجل: 'عاجل',
+  عادي: 'عادي',
+} as const;
+
+export interface PublicRequestInput {
+  /**
+     * @minLength 2
+     * @maxLength 100
+     */
+  name: string;
+  /**
+     * @minLength 7
+     * @maxLength 25
+     */
+  phone: string;
+  /**
+     * @minLength 3
+     * @maxLength 160
+     */
+  title: string;
+  /**
+     * @minLength 10
+     * @maxLength 3000
+     */
+  description: string;
+  category: PublicRequestInputCategory;
+  priority: PublicRequestInputPriority;
+}
+
+export interface PublicRequestCreated {
+  id: string;
+  title: string;
+  status: string;
+  propertyName: string;
+  unitNumber: string;
+  createdAt: string;
+}
+
+export interface PreventivePlan {
+  id: string;
+  organizationId: string;
+  propertyId: string;
+  /** @nullable */
+  propertyName: string | null;
+  /** @nullable */
+  unitId: string | null;
+  /** @nullable */
+  unitNumber: string | null;
+  /** @nullable */
+  assignedTechnicianId: string | null;
+  /** @nullable */
+  assignedTechnicianName: string | null;
+  title: string;
+  category: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  frequencyDays: number;
+  nextDueAt: string;
+  /** @nullable */
+  notes: string | null;
+  isActive: boolean;
+  /** @nullable */
+  lastCompletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PreventivePlanInput {
+  propertyId: string;
+  /** @nullable */
+  unitId?: string | null;
+  /** @nullable */
+  assignedTechnicianId?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  title: string;
+  /** @minLength 2 */
+  category: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  frequencyDays: number;
+  nextDueAt: string;
+  /** @nullable */
+  notes?: string | null;
+  isActive?: boolean;
+}
+
+export interface PreventivePlanUpdate {
+  propertyId?: string;
+  /** @nullable */
+  unitId?: string | null;
+  /** @nullable */
+  assignedTechnicianId?: string | null;
+  /**
+     * @minLength 2
+     * @maxLength 160
+     */
+  title?: string;
+  /** @minLength 2 */
+  category?: string;
+  /**
+     * @minimum 1
+     * @maximum 3650
+     */
+  frequencyDays?: number;
+  nextDueAt?: string;
+  /** @nullable */
+  notes?: string | null;
+  isActive?: boolean;
 }
 
 export interface Comment {
@@ -156,4 +351,9 @@ export interface DashboardStats {
   totalUnits: number;
   totalTechnicians: number;
 }
+
+export type GetPreventivePlansParams = {
+propertyId?: string;
+isActive?: boolean;
+};
 

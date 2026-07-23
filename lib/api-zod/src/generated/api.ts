@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * مِرفق API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.4.0
  */
 import * as zod from 'zod';
 
@@ -166,6 +166,7 @@ export const GetUnitsResponseItem = zod.object({
   "number": zod.string(),
   "floor": zod.number(),
   "propertyId": zod.string(),
+  "publicToken": zod.string().describe('Opaque token used in the unit public QR URL; managers can rotate it'),
   "residentId": zod.string().nullish(),
   "residentName": zod.string().nullish()
 })
@@ -193,6 +194,7 @@ export const CreateUnitResponse = zod.object({
   "number": zod.string(),
   "floor": zod.number(),
   "propertyId": zod.string(),
+  "publicToken": zod.string().describe('Opaque token used in the unit public QR URL; managers can rotate it'),
   "residentId": zod.string().nullish(),
   "residentName": zod.string().nullish()
 })
@@ -216,6 +218,7 @@ export const UpdateUnitResponse = zod.object({
   "number": zod.string(),
   "floor": zod.number(),
   "propertyId": zod.string(),
+  "publicToken": zod.string().describe('Opaque token used in the unit public QR URL; managers can rotate it'),
   "residentId": zod.string().nullish(),
   "residentName": zod.string().nullish()
 })
@@ -234,8 +237,40 @@ export const DeleteUnitResponse = zod.object({
 
 
 /**
+ * @summary Replace a unit public QR token (manager only)
+ */
+export const RotateUnitPublicTokenParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RotateUnitPublicTokenResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "floor": zod.number(),
+  "propertyId": zod.string(),
+  "publicToken": zod.string().describe('Opaque token used in the unit public QR URL; managers can rotate it'),
+  "residentId": zod.string().nullish(),
+  "residentName": zod.string().nullish()
+})
+
+
+/**
  * @summary List maintenance requests (role-filtered)
  */
+export const getRequestsResponseLaborCostMin = 0;
+export const getRequestsResponseLaborCostMax = 10000000;
+export const getRequestsResponseLaborCostMultipleOf = 0.01;
+
+export const getRequestsResponsePartsCostMin = 0;
+export const getRequestsResponsePartsCostMax = 10000000;
+export const getRequestsResponsePartsCostMultipleOf = 0.01;
+
+export const getRequestsResponseTotalCostMin = 0;
+
+export const getRequestsResponseRatingMax = 5;
+
+
+
 export const GetRequestsResponseItem = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -249,10 +284,18 @@ export const GetRequestsResponseItem = zod.object({
   "unitNumber": zod.string().nullish(),
   "residentId": zod.string(),
   "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
   "technicianId": zod.string().nullish(),
   "technicianName": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
+  "laborCost": zod.number().min(getRequestsResponseLaborCostMin).max(getRequestsResponseLaborCostMax).multipleOf(getRequestsResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(getRequestsResponsePartsCostMin).max(getRequestsResponsePartsCostMax).multipleOf(getRequestsResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(getRequestsResponseTotalCostMin),
+  "rating": zod.number().min(1).max(getRequestsResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 export const GetRequestsResponse = zod.array(GetRequestsResponseItem)
 
@@ -272,6 +315,20 @@ export const CreateRequestBody = zod.object({
   "unitId": zod.string()
 })
 
+export const createRequestResponseLaborCostMin = 0;
+export const createRequestResponseLaborCostMax = 10000000;
+export const createRequestResponseLaborCostMultipleOf = 0.01;
+
+export const createRequestResponsePartsCostMin = 0;
+export const createRequestResponsePartsCostMax = 10000000;
+export const createRequestResponsePartsCostMultipleOf = 0.01;
+
+export const createRequestResponseTotalCostMin = 0;
+
+export const createRequestResponseRatingMax = 5;
+
+
+
 export const CreateRequestResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -285,10 +342,18 @@ export const CreateRequestResponse = zod.object({
   "unitNumber": zod.string().nullish(),
   "residentId": zod.string(),
   "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
   "technicianId": zod.string().nullish(),
   "technicianName": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
+  "laborCost": zod.number().min(createRequestResponseLaborCostMin).max(createRequestResponseLaborCostMax).multipleOf(createRequestResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(createRequestResponsePartsCostMin).max(createRequestResponsePartsCostMax).multipleOf(createRequestResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(createRequestResponseTotalCostMin),
+  "rating": zod.number().min(1).max(createRequestResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 
@@ -298,6 +363,20 @@ export const CreateRequestResponse = zod.object({
 export const GetRequestParams = zod.object({
   "id": zod.coerce.string()
 })
+
+export const getRequestResponseLaborCostMin = 0;
+export const getRequestResponseLaborCostMax = 10000000;
+export const getRequestResponseLaborCostMultipleOf = 0.01;
+
+export const getRequestResponsePartsCostMin = 0;
+export const getRequestResponsePartsCostMax = 10000000;
+export const getRequestResponsePartsCostMultipleOf = 0.01;
+
+export const getRequestResponseTotalCostMin = 0;
+
+export const getRequestResponseRatingMax = 5;
+
+
 
 export const GetRequestResponse = zod.object({
   "id": zod.string(),
@@ -312,10 +391,18 @@ export const GetRequestResponse = zod.object({
   "unitNumber": zod.string().nullish(),
   "residentId": zod.string(),
   "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
   "technicianId": zod.string().nullish(),
   "technicianName": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
+  "laborCost": zod.number().min(getRequestResponseLaborCostMin).max(getRequestResponseLaborCostMax).multipleOf(getRequestResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(getRequestResponsePartsCostMin).max(getRequestResponsePartsCostMax).multipleOf(getRequestResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(getRequestResponseTotalCostMin),
+  "rating": zod.number().min(1).max(getRequestResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 
@@ -334,6 +421,20 @@ export const UpdateRequestBody = zod.object({
   "description": zod.string().optional()
 })
 
+export const updateRequestResponseLaborCostMin = 0;
+export const updateRequestResponseLaborCostMax = 10000000;
+export const updateRequestResponseLaborCostMultipleOf = 0.01;
+
+export const updateRequestResponsePartsCostMin = 0;
+export const updateRequestResponsePartsCostMax = 10000000;
+export const updateRequestResponsePartsCostMultipleOf = 0.01;
+
+export const updateRequestResponseTotalCostMin = 0;
+
+export const updateRequestResponseRatingMax = 5;
+
+
+
 export const UpdateRequestResponse = zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -347,10 +448,142 @@ export const UpdateRequestResponse = zod.object({
   "unitNumber": zod.string().nullish(),
   "residentId": zod.string(),
   "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
   "technicianId": zod.string().nullish(),
   "technicianName": zod.string().nullish(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string()
+  "laborCost": zod.number().min(updateRequestResponseLaborCostMin).max(updateRequestResponseLaborCostMax).multipleOf(updateRequestResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(updateRequestResponsePartsCostMin).max(updateRequestResponsePartsCostMax).multipleOf(updateRequestResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(updateRequestResponseTotalCostMin),
+  "rating": zod.number().min(1).max(updateRequestResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update request labor and parts costs (manager only)
+ */
+export const UpdateRequestCostsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateRequestCostsBodyLaborCostMin = 0;
+export const updateRequestCostsBodyLaborCostMax = 10000000;
+export const updateRequestCostsBodyLaborCostMultipleOf = 0.01;
+
+export const updateRequestCostsBodyPartsCostMin = 0;
+export const updateRequestCostsBodyPartsCostMax = 10000000;
+export const updateRequestCostsBodyPartsCostMultipleOf = 0.01;
+
+
+
+export const UpdateRequestCostsBody = zod.object({
+  "laborCost": zod.number().min(updateRequestCostsBodyLaborCostMin).max(updateRequestCostsBodyLaborCostMax).multipleOf(updateRequestCostsBodyLaborCostMultipleOf).optional(),
+  "partsCost": zod.number().min(updateRequestCostsBodyPartsCostMin).max(updateRequestCostsBodyPartsCostMax).multipleOf(updateRequestCostsBodyPartsCostMultipleOf).optional()
+})
+
+export const updateRequestCostsResponseLaborCostMin = 0;
+export const updateRequestCostsResponseLaborCostMax = 10000000;
+export const updateRequestCostsResponseLaborCostMultipleOf = 0.01;
+
+export const updateRequestCostsResponsePartsCostMin = 0;
+export const updateRequestCostsResponsePartsCostMax = 10000000;
+export const updateRequestCostsResponsePartsCostMultipleOf = 0.01;
+
+export const updateRequestCostsResponseTotalCostMin = 0;
+
+export const updateRequestCostsResponseRatingMax = 5;
+
+
+
+export const UpdateRequestCostsResponse = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "priority": zod.string(),
+  "status": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullish(),
+  "unitId": zod.string(),
+  "unitNumber": zod.string().nullish(),
+  "residentId": zod.string(),
+  "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
+  "technicianId": zod.string().nullish(),
+  "technicianName": zod.string().nullish(),
+  "laborCost": zod.number().min(updateRequestCostsResponseLaborCostMin).max(updateRequestCostsResponseLaborCostMax).multipleOf(updateRequestCostsResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(updateRequestCostsResponsePartsCostMin).max(updateRequestCostsResponsePartsCostMax).multipleOf(updateRequestCostsResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(updateRequestCostsResponseTotalCostMin),
+  "rating": zod.number().min(1).max(updateRequestCostsResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Rate a completed request (owning resident only)
+ */
+export const RateRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const rateRequestBodyRatingMax = 5;
+
+export const rateRequestBodyCommentMax = 1000;
+
+
+
+export const RateRequestBody = zod.object({
+  "rating": zod.number().min(1).max(rateRequestBodyRatingMax),
+  "comment": zod.string().max(rateRequestBodyCommentMax).optional()
+})
+
+export const rateRequestResponseLaborCostMin = 0;
+export const rateRequestResponseLaborCostMax = 10000000;
+export const rateRequestResponseLaborCostMultipleOf = 0.01;
+
+export const rateRequestResponsePartsCostMin = 0;
+export const rateRequestResponsePartsCostMax = 10000000;
+export const rateRequestResponsePartsCostMultipleOf = 0.01;
+
+export const rateRequestResponseTotalCostMin = 0;
+
+export const rateRequestResponseRatingMax = 5;
+
+
+
+export const RateRequestResponse = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "priority": zod.string(),
+  "status": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullish(),
+  "unitId": zod.string(),
+  "unitNumber": zod.string().nullish(),
+  "residentId": zod.string(),
+  "residentName": zod.string().nullish(),
+  "reporterName": zod.string().nullish().describe('Name entered by a public QR reporter'),
+  "reporterPhone": zod.string().nullish().describe('Phone entered by a public QR reporter'),
+  "technicianId": zod.string().nullish(),
+  "technicianName": zod.string().nullish(),
+  "laborCost": zod.number().min(rateRequestResponseLaborCostMin).max(rateRequestResponseLaborCostMax).multipleOf(rateRequestResponseLaborCostMultipleOf),
+  "partsCost": zod.number().min(rateRequestResponsePartsCostMin).max(rateRequestResponsePartsCostMax).multipleOf(rateRequestResponsePartsCostMultipleOf),
+  "totalCost": zod.number().min(rateRequestResponseTotalCostMin),
+  "rating": zod.number().min(1).max(rateRequestResponseRatingMax).nullish(),
+  "ratingComment": zod.string().nullish(),
+  "ratedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 
@@ -421,6 +654,273 @@ export const GetDashboardStatsResponse = zod.object({
   "totalProperties": zod.number(),
   "totalUnits": zod.number(),
   "totalTechnicians": zod.number()
+})
+
+
+/**
+ * @summary Resolve a unit public QR token
+ */
+export const GetPublicUnitParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const GetPublicUnitResponse = zod.object({
+  "orgName": zod.string(),
+  "propertyName": zod.string(),
+  "unitId": zod.string(),
+  "unitNumber": zod.string()
+})
+
+
+/**
+ * @summary Create a maintenance request from a unit QR page
+ */
+export const CreatePublicRequestParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const createPublicRequestBodyNameMin = 2;
+export const createPublicRequestBodyNameMax = 100;
+
+export const createPublicRequestBodyPhoneMin = 7;
+export const createPublicRequestBodyPhoneMax = 25;
+
+export const createPublicRequestBodyTitleMin = 3;
+export const createPublicRequestBodyTitleMax = 160;
+
+export const createPublicRequestBodyDescriptionMin = 10;
+export const createPublicRequestBodyDescriptionMax = 3000;
+
+
+
+export const CreatePublicRequestBody = zod.object({
+  "name": zod.string().min(createPublicRequestBodyNameMin).max(createPublicRequestBodyNameMax),
+  "phone": zod.string().min(createPublicRequestBodyPhoneMin).max(createPublicRequestBodyPhoneMax),
+  "title": zod.string().min(createPublicRequestBodyTitleMin).max(createPublicRequestBodyTitleMax),
+  "description": zod.string().min(createPublicRequestBodyDescriptionMin).max(createPublicRequestBodyDescriptionMax),
+  "category": zod.enum(['كهرباء', 'سباكة', 'تكييف', 'أخرى']),
+  "priority": zod.enum(['عاجل', 'عادي'])
+})
+
+export const CreatePublicRequestResponse = zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "status": zod.string(),
+  "propertyName": zod.string(),
+  "unitNumber": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List preventive plans (manager or assigned technician)
+ */
+export const GetPreventivePlansQueryParams = zod.object({
+  "propertyId": zod.coerce.string().optional(),
+  "isActive": zod.coerce.boolean().optional()
+})
+
+export const getPreventivePlansResponseFrequencyDaysMax = 3650;
+
+
+
+export const GetPreventivePlansResponseItem = zod.object({
+  "id": zod.string(),
+  "organizationId": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullable(),
+  "unitId": zod.string().nullable(),
+  "unitNumber": zod.string().nullable(),
+  "assignedTechnicianId": zod.string().nullable(),
+  "assignedTechnicianName": zod.string().nullable(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "frequencyDays": zod.number().min(1).max(getPreventivePlansResponseFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const GetPreventivePlansResponse = zod.array(GetPreventivePlansResponseItem)
+
+
+/**
+ * @summary Create a preventive plan (manager only)
+ */
+export const createPreventivePlanBodyTitleMin = 2;
+export const createPreventivePlanBodyTitleMax = 160;
+
+export const createPreventivePlanBodyCategoryMin = 2;
+
+export const createPreventivePlanBodyFrequencyDaysMax = 3650;
+
+
+
+export const CreatePreventivePlanBody = zod.object({
+  "propertyId": zod.string(),
+  "unitId": zod.string().nullish(),
+  "assignedTechnicianId": zod.string().nullish(),
+  "title": zod.string().min(createPreventivePlanBodyTitleMin).max(createPreventivePlanBodyTitleMax),
+  "category": zod.string().min(createPreventivePlanBodyCategoryMin),
+  "frequencyDays": zod.number().min(1).max(createPreventivePlanBodyFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullish(),
+  "isActive": zod.boolean().optional()
+})
+
+export const createPreventivePlanResponseFrequencyDaysMax = 3650;
+
+
+
+export const CreatePreventivePlanResponse = zod.object({
+  "id": zod.string(),
+  "organizationId": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullable(),
+  "unitId": zod.string().nullable(),
+  "unitNumber": zod.string().nullable(),
+  "assignedTechnicianId": zod.string().nullable(),
+  "assignedTechnicianName": zod.string().nullable(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "frequencyDays": zod.number().min(1).max(createPreventivePlanResponseFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get a preventive plan (manager or assigned technician)
+ */
+export const GetPreventivePlanParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const getPreventivePlanResponseFrequencyDaysMax = 3650;
+
+
+
+export const GetPreventivePlanResponse = zod.object({
+  "id": zod.string(),
+  "organizationId": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullable(),
+  "unitId": zod.string().nullable(),
+  "unitNumber": zod.string().nullable(),
+  "assignedTechnicianId": zod.string().nullable(),
+  "assignedTechnicianName": zod.string().nullable(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "frequencyDays": zod.number().min(1).max(getPreventivePlanResponseFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a preventive plan (manager only)
+ */
+export const UpdatePreventivePlanParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updatePreventivePlanBodyTitleMin = 2;
+export const updatePreventivePlanBodyTitleMax = 160;
+
+export const updatePreventivePlanBodyCategoryMin = 2;
+
+export const updatePreventivePlanBodyFrequencyDaysMax = 3650;
+
+
+
+export const UpdatePreventivePlanBody = zod.object({
+  "propertyId": zod.string().optional(),
+  "unitId": zod.string().nullish(),
+  "assignedTechnicianId": zod.string().nullish(),
+  "title": zod.string().min(updatePreventivePlanBodyTitleMin).max(updatePreventivePlanBodyTitleMax).optional(),
+  "category": zod.string().min(updatePreventivePlanBodyCategoryMin).optional(),
+  "frequencyDays": zod.number().min(1).max(updatePreventivePlanBodyFrequencyDaysMax).optional(),
+  "nextDueAt": zod.coerce.date().optional(),
+  "notes": zod.string().nullish(),
+  "isActive": zod.boolean().optional()
+})
+
+export const updatePreventivePlanResponseFrequencyDaysMax = 3650;
+
+
+
+export const UpdatePreventivePlanResponse = zod.object({
+  "id": zod.string(),
+  "organizationId": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullable(),
+  "unitId": zod.string().nullable(),
+  "unitNumber": zod.string().nullable(),
+  "assignedTechnicianId": zod.string().nullable(),
+  "assignedTechnicianName": zod.string().nullable(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "frequencyDays": zod.number().min(1).max(updatePreventivePlanResponseFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a preventive plan (manager only)
+ */
+export const DeletePreventivePlanParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeletePreventivePlanResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Complete a plan cycle and schedule its next due date
+ */
+export const CompletePreventivePlanParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const completePreventivePlanResponseFrequencyDaysMax = 3650;
+
+
+
+export const CompletePreventivePlanResponse = zod.object({
+  "id": zod.string(),
+  "organizationId": zod.string(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string().nullable(),
+  "unitId": zod.string().nullable(),
+  "unitNumber": zod.string().nullable(),
+  "assignedTechnicianId": zod.string().nullable(),
+  "assignedTechnicianName": zod.string().nullable(),
+  "title": zod.string(),
+  "category": zod.string(),
+  "frequencyDays": zod.number().min(1).max(completePreventivePlanResponseFrequencyDaysMax),
+  "nextDueAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "isActive": zod.boolean(),
+  "lastCompletedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 })
 
 

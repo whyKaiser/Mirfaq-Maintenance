@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * مِرفق API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.4.0
  */
 
 export interface LoginInput {

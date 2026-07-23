@@ -6,11 +6,11 @@
  * OpenAPI spec version: 0.4.0
  */
 
-export interface TechnicianProfile {
+export interface PublicRequestCreated {
   id: string;
-  userId: string;
-  name: string;
-  specialty: string;
-  phone: string;
-  activeJobsCount: number;
+  title: string;
+  status: string;
+  propertyName: string;
+  unitNumber: string;
+  createdAt: Date;
 }

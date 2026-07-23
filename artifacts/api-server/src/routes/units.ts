@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
@@ -5,85 +6,158 @@ import { logAction } from "../lib/audit";
 
 const router = Router();
 
+function generatePublicToken() {
+  return `unit_${randomBytes(32).toString("base64url")}`;
+}
+
 function fmtUnit(u: {
-  id: string; number: string; floor: number; propertyId: string;
-  residentId: string | null; resident: { id: string; name: string } | null;
+  id: string;
+  number: string;
+  floor: number;
+  propertyId: string;
+  publicToken: string;
+  residentId: string | null;
+  resident: { id: string; name: string } | null;
 }) {
   return {
     id: u.id,
     number: u.number,
     floor: u.floor,
     propertyId: u.propertyId,
+    publicToken: u.publicToken,
     residentId: u.residentId,
     residentName: u.resident?.name ?? null,
   };
 }
 
 // GET /api/properties/:propertyId/units
-router.get("/properties/:propertyId/units", requireRole("manager"), async (req, res) => {
-  try {
-    const prop = await prisma.property.findFirst({
-      where: { id: req.params.propertyId, organizationId: req.session.organizationId! },
-    });
-    if (!prop) return res.status(404).json({ error: "العقار غير موجود" });
+router.get(
+  "/properties/:propertyId/units",
+  requireRole("manager"),
+  async (req, res) => {
+    try {
+      const prop = await prisma.property.findFirst({
+        where: {
+          id: req.params.propertyId,
+          organizationId: req.session.organizationId!,
+        },
+      });
+      if (!prop) return res.status(404).json({ error: "العقار غير موجود" });
 
-    const units = await prisma.unit.findMany({
-      where: { propertyId: req.params.propertyId },
-      include: { resident: { select: { id: true, name: true } } },
-      orderBy: [{ floor: "asc" }, { number: "asc" }],
-    });
-    res.json(units.map(fmtUnit));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "خطأ في الخادم" });
-  }
-});
+      const units = await prisma.unit.findMany({
+        where: { propertyId: req.params.propertyId },
+        include: { resident: { select: { id: true, name: true } } },
+        orderBy: [{ floor: "asc" }, { number: "asc" }],
+      });
+      res.json(units.map(fmtUnit));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
+    }
+  },
+);
 
 // POST /api/properties/:propertyId/units
-router.post("/properties/:propertyId/units", requireRole("manager"), async (req, res) => {
-  try {
-    const prop = await prisma.property.findFirst({
-      where: { id: req.params.propertyId, organizationId: req.session.organizationId! },
-    });
-    if (!prop) return res.status(404).json({ error: "العقار غير موجود" });
+router.post(
+  "/properties/:propertyId/units",
+  requireRole("manager"),
+  async (req, res) => {
+    try {
+      const prop = await prisma.property.findFirst({
+        where: {
+          id: req.params.propertyId,
+          organizationId: req.session.organizationId!,
+        },
+      });
+      if (!prop) return res.status(404).json({ error: "العقار غير موجود" });
 
-    const { number, floor, residentId } = req.body as {
-      number?: string; floor?: number; residentId?: string | null;
-    };
-    if (!number?.trim() || floor === undefined) {
-      return res.status(400).json({ error: "رقم الوحدة والطابق مطلوبان" });
+      const { number, floor, residentId } = req.body as {
+        number?: string;
+        floor?: number;
+        residentId?: string | null;
+      };
+      if (!number?.trim() || floor === undefined) {
+        return res.status(400).json({ error: "رقم الوحدة والطابق مطلوبان" });
+      }
+
+      // Validate resident belongs to same org
+      if (residentId) {
+        const r = await prisma.user.findFirst({
+          where: {
+            id: residentId,
+            organizationId: req.session.organizationId!,
+          },
+        });
+        if (!r) return res.status(400).json({ error: "الساكن غير موجود" });
+      }
+
+      const unit = await prisma.unit.create({
+        data: {
+          number: number.trim(),
+          floor: Number(floor),
+          propertyId: req.params.propertyId,
+          residentId: residentId || null,
+          publicToken: generatePublicToken(),
+        },
+        include: { resident: { select: { id: true, name: true } } },
+      });
+      await logAction({
+        organizationId: req.session.organizationId!,
+        actorId: req.session.userId!,
+        actorName: req.session.userName!,
+        action: "create_unit",
+        entityType: "unit",
+        entityId: unit.id,
+        entityLabel: `${prop.name} - وحدة ${unit.number}`,
+      });
+      res.status(201).json(fmtUnit(unit));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
     }
+  },
+);
 
-    // Validate resident belongs to same org
-    if (residentId) {
-      const r = await prisma.user.findFirst({ where: { id: residentId, organizationId: req.session.organizationId! } });
-      if (!r) return res.status(400).json({ error: "الساكن غير موجود" });
+// POST /api/units/:id/public-token/rotate
+router.post(
+  "/units/:id/public-token/rotate",
+  requireRole("manager"),
+  async (req, res) => {
+    try {
+      const unit = await prisma.unit.findFirst({
+        where: {
+          id: req.params.id,
+          property: { organizationId: req.session.organizationId! },
+        },
+        select: { id: true, number: true },
+      });
+      if (!unit) {
+        return res.status(404).json({ error: "الوحدة غير موجودة" });
+      }
+
+      const updated = await prisma.unit.update({
+        where: { id: unit.id },
+        data: { publicToken: generatePublicToken() },
+        include: { resident: { select: { id: true, name: true } } },
+      });
+
+      await logAction({
+        organizationId: req.session.organizationId!,
+        actorId: req.session.userId!,
+        actorName: req.session.userName!,
+        action: "rotate_unit_public_token",
+        entityType: "unit",
+        entityId: unit.id,
+        entityLabel: `وحدة ${unit.number}`,
+      });
+
+      res.json(fmtUnit(updated));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "خطأ في الخادم" });
     }
-
-    const unit = await prisma.unit.create({
-      data: {
-        number: number.trim(),
-        floor: Number(floor),
-        propertyId: req.params.propertyId,
-        residentId: residentId || null,
-      },
-      include: { resident: { select: { id: true, name: true } } },
-    });
-    await logAction({
-      organizationId: req.session.organizationId!,
-      actorId: req.session.userId!,
-      actorName: req.session.userName!,
-      action: "create_unit",
-      entityType: "unit",
-      entityId: unit.id,
-      entityLabel: `${prop.name} - وحدة ${unit.number}`,
-    });
-    res.status(201).json(fmtUnit(unit));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "خطأ في الخادم" });
-  }
-});
+  },
+);
 
 // PATCH /api/units/:id
 router.patch("/units/:id", requireRole("manager"), async (req, res) => {
@@ -97,12 +171,16 @@ router.patch("/units/:id", requireRole("manager"), async (req, res) => {
     }
 
     const { number, floor, residentId } = req.body as {
-      number?: string; floor?: number; residentId?: string | null;
+      number?: string;
+      floor?: number;
+      residentId?: string | null;
     };
 
     // Validate new resident belongs to same org
     if (residentId) {
-      const r = await prisma.user.findFirst({ where: { id: residentId, organizationId: req.session.organizationId! } });
+      const r = await prisma.user.findFirst({
+        where: { id: residentId, organizationId: req.session.organizationId! },
+      });
       if (!r) return res.status(400).json({ error: "الساكن غير موجود" });
     }
 

@@ -29,12 +29,13 @@ model Organization {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  users       User[]
-  properties  Property[]
-  requests    MaintenanceRequest[]
-  attachments RequestAttachment[]
-  auditLogs   AuditLog[]
-  leads       SalesLead[]
+  users           User[]
+  properties      Property[]
+  requests        MaintenanceRequest[]
+  attachments     RequestAttachment[]
+  auditLogs       AuditLog[]
+  leads           SalesLead[]
+  preventivePlans PreventivePlan[]
 }
 
 model User {
@@ -68,22 +69,25 @@ model Property {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization         @relation(fields: [organizationId], references: [id])
-  manager      User                 @relation("PropertyManager", fields: [managerId], references: [id])
-  units        Unit[]
-  requests     MaintenanceRequest[]
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  manager         User                 @relation("PropertyManager", fields: [managerId], references: [id])
+  units           Unit[]
+  requests        MaintenanceRequest[]
+  preventivePlans PreventivePlan[]
 }
 
 model Unit {
-  id         String  @id @default(cuid())
-  number     String
-  floor      Int
-  propertyId String
-  residentId String? @unique
+  id          String  @id @default(cuid())
+  number      String
+  floor       Int
+  propertyId  String
+  residentId  String? @unique
+  publicToken String  @unique @default(cuid())
 
-  property Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  resident User?                @relation("UnitResident", fields: [residentId], references: [id])
-  requests MaintenanceRequest[]
+  property        Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  resident        User?                @relation("UnitResident", fields: [residentId], references: [id])
+  requests        MaintenanceRequest[]
+  preventivePlans PreventivePlan[]
 }
 
 model TechnicianProfile {
@@ -92,24 +96,32 @@ model TechnicianProfile {
   specialty String
   phone     String?
 
-  user     User                 @relation(fields: [userId], references: [id])
-  requests MaintenanceRequest[]
+  user            User                 @relation(fields: [userId], references: [id])
+  requests        MaintenanceRequest[]
+  preventivePlans PreventivePlan[]
 }
 
 model MaintenanceRequest {
-  id             String   @id @default(cuid())
-  title          String
-  description    String
-  category       String // كهرباء | سباكة | تكييف | أخرى
-  priority       String // عاجل | عادي
-  status         String // معلّقة | قيد التنفيذ | مكتملة
-  propertyId     String
-  unitId         String
-  residentId     String
-  technicianId   String?
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  description      String
+  category         String // كهرباء | سباكة | تكييف | أخرى
+  priority         String // عاجل | عادي
+  status           String // معلّقة | قيد التنفيذ | مكتملة
+  propertyId       String
+  unitId           String
+  residentId       String
+  technicianId     String?
+  organizationId   String
+  reporterName     String?
+  reporterPhone    String?
+  laborCostHalalas Int       @default(0)
+  partsCostHalalas Int       @default(0)
+  rating           Int?
+  ratingComment    String?
+  ratedAt          DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   property     Property            @relation(fields: [propertyId], references: [id])
@@ -118,6 +130,33 @@ model MaintenanceRequest {
   technician   TechnicianProfile?  @relation(fields: [technicianId], references: [id])
   comments     RequestComment[]
   attachments  RequestAttachment[]
+}
+
+model PreventivePlan {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  propertyId           String
+  unitId               String?
+  assignedTechnicianId String?
+  title                String
+  category             String
+  frequencyDays        Int
+  nextDueAt            DateTime
+  notes                String?
+  isActive             Boolean   @default(true)
+  lastCompletedAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  organization       Organization       @relation(fields: [organizationId], references: [id])
+  property           Property           @relation(fields: [propertyId], references: [id])
+  unit               Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  assignedTechnician TechnicianProfile? @relation(fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, nextDueAt])
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([assignedTechnicianId])
 }
 
 model RequestComment {

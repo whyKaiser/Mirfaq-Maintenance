@@ -317,6 +317,23 @@ async function main() {
     },
   });
 
+  await prisma.preventivePlan.upsert({
+    where: { id: "plan-ac-yasmin" },
+    update: {},
+    create: {
+      id: "plan-ac-yasmin",
+      organizationId: org.id,
+      propertyId: property1.id,
+      unitId: unit3B.id,
+      assignedTechnicianId: techProfile.id,
+      title: "صيانة دورية لمكيف الوحدة",
+      category: "تكييف",
+      frequencyDays: 90,
+      nextDueAt: new Date("2026-08-01T06:00:00.000Z"),
+      notes: "تنظيف الفلاتر وفحص غاز التبريد",
+    },
+  });
+
   // ──────────────────────────────────────────────
   // Comments
   // ──────────────────────────────────────────────

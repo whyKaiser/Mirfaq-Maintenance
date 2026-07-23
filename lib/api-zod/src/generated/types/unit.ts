@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * مِرفق API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.4.0
  */
 
 export interface Unit {
@@ -11,6 +11,8 @@ export interface Unit {
   number: string;
   floor: number;
   propertyId: string;
+  /** Opaque token used in the unit public QR URL; managers can rotate it */
+  publicToken: string;
   /** @nullable */
   residentId?: string | null;
   /** @nullable */

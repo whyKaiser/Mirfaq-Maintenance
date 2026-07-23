@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * مِرفق API specification
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.4.0
  */
 
 export interface MaintenanceRequest {
@@ -22,10 +22,42 @@ export interface MaintenanceRequest {
   residentId: string;
   /** @nullable */
   residentName?: string | null;
+  /**
+     * Name entered by a public QR reporter
+     * @nullable
+     */
+  reporterName?: string | null;
+  /**
+     * Phone entered by a public QR reporter
+     * @nullable
+     */
+  reporterPhone?: string | null;
   /** @nullable */
   technicianId?: string | null;
   /** @nullable */
   technicianName?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  laborCost: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  partsCost: number;
+  /** @minimum 0 */
+  readonly totalCost: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  rating?: number | null;
+  /** @nullable */
+  ratingComment?: string | null;
+  /** @nullable */
+  ratedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
