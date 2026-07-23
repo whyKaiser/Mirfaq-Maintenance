@@ -5,6 +5,7 @@
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
     "rootDir": "src",
+    "noImplicitReturns": false,
     "types": ["node", "express-session"]
   },
   "include": ["src"],
