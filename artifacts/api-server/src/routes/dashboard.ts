@@ -4,42 +4,23 @@ import { prisma } from "../lib/prisma";
 
 const router = Router();
 
-// GET /api/dashboard/stats
+// GET /api/dashboard/stats  (manager-only, org-isolated)
 router.get("/dashboard/stats", requireRole("manager"), async (req, res) => {
   try {
-    const userId = req.session.userId!;
+    const orgId = req.session.organizationId!;
 
-    const properties = await prisma.property.findMany({
-      where: { managerId: userId },
-      select: { id: true },
-    });
-    const propertyIds = properties.map((p) => p.id);
-
-    const [totalRequests, pending, inProgress, completed, totalUnits, totalTechnicians] =
+    const [totalRequests, pending, inProgress, completed, totalProperties, totalUnits, totalTechnicians] =
       await Promise.all([
-        prisma.maintenanceRequest.count({ where: { propertyId: { in: propertyIds } } }),
-        prisma.maintenanceRequest.count({
-          where: { propertyId: { in: propertyIds }, status: "معلّقة" },
-        }),
-        prisma.maintenanceRequest.count({
-          where: { propertyId: { in: propertyIds }, status: "قيد التنفيذ" },
-        }),
-        prisma.maintenanceRequest.count({
-          where: { propertyId: { in: propertyIds }, status: "مكتملة" },
-        }),
-        prisma.unit.count({ where: { propertyId: { in: propertyIds } } }),
-        prisma.technicianProfile.count(),
+        prisma.maintenanceRequest.count({ where: { organizationId: orgId } }),
+        prisma.maintenanceRequest.count({ where: { organizationId: orgId, status: "معلّقة" } }),
+        prisma.maintenanceRequest.count({ where: { organizationId: orgId, status: "قيد التنفيذ" } }),
+        prisma.maintenanceRequest.count({ where: { organizationId: orgId, status: "مكتملة" } }),
+        prisma.property.count({ where: { organizationId: orgId } }),
+        prisma.unit.count({ where: { property: { organizationId: orgId } } }),
+        prisma.technicianProfile.count({ where: { user: { organizationId: orgId, isActive: true } } }),
       ]);
 
-    res.json({
-      totalRequests,
-      pending,
-      inProgress,
-      completed,
-      totalProperties: properties.length,
-      totalUnits,
-      totalTechnicians,
-    });
+    res.json({ totalRequests, pending, inProgress, completed, totalProperties, totalUnits, totalTechnicians });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "خطأ في الخادم" });

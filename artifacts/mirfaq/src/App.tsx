@@ -10,6 +10,8 @@ import LoginPage from '@/pages/login';
 import ManagerDashboard from '@/pages/manager';
 import ResidentDashboard from '@/pages/resident';
 import TechnicianDashboard from '@/pages/technician';
+import PrintWorkOrder from '@/pages/print-work-order';
+import PrintMonthly from '@/pages/print-monthly';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/manager" component={ManagerDashboard} />
       <Route path="/resident" component={ResidentDashboard} />
       <Route path="/technician" component={TechnicianDashboard} />
+      <Route path="/print/work-order/:requestId" component={PrintWorkOrder} />
+      <Route path="/print/monthly" component={PrintMonthly} />
       <Route component={NotFound} />
     </Switch>
   );

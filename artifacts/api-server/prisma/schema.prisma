@@ -1,6 +1,12 @@
-// Prisma schema for مِرفق — property maintenance management
+// Prisma schema for مِرفق — property maintenance management (Phase 3)
 // Uses SQLite for development demo.
-// To migrate to PostgreSQL: change provider to "postgresql" and update MIRFAQ_DB_URL.
+//
+// To migrate to PostgreSQL:
+//   1. Change provider to "postgresql"
+//   2. Change MIRFAQ_DB_URL to a postgres connection string
+//   3. Run: prisma migrate deploy
+//
+// To migrate file storage to S3: see src/lib/storage.ts
 
 generator client {
   provider = "prisma-client-js"
@@ -11,33 +17,60 @@ datasource db {
   url      = env("MIRFAQ_DB_URL")
 }
 
-model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         String   // "manager" | "resident" | "technician"
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// ─── Multi-tenancy root ────────────────────────────────────────────────────────
+model Organization {
+  id         String   @id @default(cuid())
+  name       String
+  crNumber   String?  // رقم السجل التجاري
+  phone      String?
+  city       String   @default("الرياض")
+  brandColor String   @default("#0891b2")
+  logoUrl    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  managedProperties  Property[]           @relation("PropertyManager")
-  residentUnit       Unit?                @relation("UnitResident")
-  technicianProfile  TechnicianProfile?
-  residentRequests   MaintenanceRequest[] @relation("RequestResident")
-  comments           RequestComment[]
+  users       User[]
+  properties  Property[]
+  requests    MaintenanceRequest[]
+  attachments RequestAttachment[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  phone          String?
+  passwordHash   String
+  role           String   // "manager" | "resident" | "technician"
+  isActive       Boolean  @default(true)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  managedProperties   Property[]           @relation("PropertyManager")
+  residentUnit        Unit?                @relation("UnitResident")
+  technicianProfile   TechnicianProfile?
+  residentRequests    MaintenanceRequest[] @relation("RequestResident")
+  comments            RequestComment[]
+  uploadedAttachments RequestAttachment[]
+  auditLogs           AuditLog[]           @relation("AuditActor")
 }
 
 model Property {
-  id        String   @id @default(cuid())
-  name      String
-  address   String
-  managerId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  address        String
+  managerId      String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  manager  User                 @relation("PropertyManager", fields: [managerId], references: [id])
-  units    Unit[]
-  requests MaintenanceRequest[]
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  manager      User                 @relation("PropertyManager", fields: [managerId], references: [id])
+  units        Unit[]
+  requests     MaintenanceRequest[]
 }
 
 model Unit {
@@ -53,34 +86,37 @@ model Unit {
 }
 
 model TechnicianProfile {
-  id        String @id @default(cuid())
-  userId    String @unique
+  id        String  @id @default(cuid())
+  userId    String  @unique
   specialty String
-  phone     String
+  phone     String?
 
   user     User                 @relation(fields: [userId], references: [id])
   requests MaintenanceRequest[]
 }
 
 model MaintenanceRequest {
-  id           String   @id @default(cuid())
-  title        String
-  description  String
-  category     String   // كهرباء | سباكة | تكييف | أخرى
-  priority     String   // عاجل | عادي
-  status       String   // معلّقة | قيد التنفيذ | مكتملة
-  propertyId   String
-  unitId       String
-  residentId   String
-  technicianId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  title          String
+  description    String
+  category       String   // كهرباء | سباكة | تكييف | أخرى
+  priority       String   // عاجل | عادي
+  status         String   // معلّقة | قيد التنفيذ | مكتملة
+  propertyId     String
+  unitId         String
+  residentId     String
+  technicianId   String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  property   Property           @relation(fields: [propertyId], references: [id])
-  unit       Unit               @relation(fields: [unitId], references: [id])
-  resident   User               @relation("RequestResident", fields: [residentId], references: [id])
-  technician TechnicianProfile? @relation(fields: [technicianId], references: [id])
-  comments   RequestComment[]
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  property     Property           @relation(fields: [propertyId], references: [id])
+  unit         Unit               @relation(fields: [unitId], references: [id])
+  resident     User               @relation("RequestResident", fields: [residentId], references: [id])
+  technician   TechnicianProfile? @relation(fields: [technicianId], references: [id])
+  comments     RequestComment[]
+  attachments  RequestAttachment[]
 }
 
 model RequestComment {
@@ -92,4 +128,41 @@ model RequestComment {
 
   request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
   author  User               @relation(fields: [authorId], references: [id])
+}
+
+// ─── File attachments ─────────────────────────────────────────────────────────
+// filePath stores just the filename (UUID-based); files live in <cwd>/uploads/
+// To replace with S3: see src/lib/storage.ts
+model RequestAttachment {
+  id             String   @id @default(cuid())
+  requestId      String
+  uploaderUserId String
+  organizationId String
+  filePath       String   // filename only, e.g. "uuid.jpg"
+  fileName       String   // original name shown to user
+  mimeType       String
+  sizeBytes      Int
+  attachmentType String   // "initial" | "completion"
+  createdAt      DateTime @default(now())
+
+  request      MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  uploader     User               @relation(fields: [uploaderUserId], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
+}
+
+// ─── Audit log ────────────────────────────────────────────────────────────────
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String
+  actorName      String
+  action         String   // e.g. "create_request", "assign_technician"
+  entityType     String   // "request" | "property" | "unit" | "user"
+  entityId       String?
+  entityLabel    String?
+  details        String?  // JSON string for extra context
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  actor        User         @relation("AuditActor", fields: [actorId], references: [id])
 }

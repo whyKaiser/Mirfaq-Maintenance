@@ -4,12 +4,15 @@ import { prisma } from "../lib/prisma";
 
 const router = Router();
 
-// GET /api/technicians
+// GET /api/technicians  (manager-only, org-isolated)
 router.get("/technicians", requireRole("manager"), async (req, res) => {
   try {
+    const orgId = req.session.organizationId!;
+
     const technicians = await prisma.technicianProfile.findMany({
+      where: { user: { organizationId: orgId, isActive: true } },
       include: {
-        user: { select: { name: true } },
+        user: { select: { name: true, phone: true } },
         _count: {
           select: {
             requests: { where: { status: "قيد التنفيذ" } },
@@ -24,7 +27,7 @@ router.get("/technicians", requireRole("manager"), async (req, res) => {
         userId: t.userId,
         name: t.user.name,
         specialty: t.specialty,
-        phone: t.phone,
+        phone: t.phone ?? t.user.phone ?? "",
         activeJobsCount: t._count.requests,
       })),
     );

@@ -24,8 +24,13 @@ export const GetMeResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "email": zod.string(),
+  "phone": zod.string().nullish(),
   "role": zod.string(),
-  "unitId": zod.string().nullish()
+  "isActive": zod.boolean().optional(),
+  "unitId": zod.string().nullish(),
+  "organizationId": zod.string(),
+  "organizationName": zod.string().optional(),
+  "brandColor": zod.string().optional()
 })
 
 
@@ -44,8 +49,13 @@ export const LoginResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "email": zod.string(),
+  "phone": zod.string().nullish(),
   "role": zod.string(),
-  "unitId": zod.string().nullish()
+  "isActive": zod.boolean().optional(),
+  "unitId": zod.string().nullish(),
+  "organizationId": zod.string(),
+  "organizationName": zod.string().optional(),
+  "brandColor": zod.string().optional()
 })
 
 

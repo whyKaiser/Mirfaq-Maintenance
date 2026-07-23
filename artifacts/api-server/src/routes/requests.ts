@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
+import { logAction } from "../lib/audit";
+import { getFileUrl } from "../lib/storage";
 
 const router = Router();
 
@@ -33,14 +35,15 @@ function fmtRequest(r: any) {
   };
 }
 
-// GET /api/requests (role-filtered)
+// GET /api/requests (role-filtered, org-isolated)
 router.get("/requests", requireAuth, async (req, res) => {
   try {
     const role = req.session.userRole!;
     const userId = req.session.userId!;
+    const orgId = req.session.organizationId!;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let where: any = {};
+    let where: any = { organizationId: orgId };
 
     if (role === "resident") {
       where.residentId = userId;
@@ -48,13 +51,8 @@ router.get("/requests", requireAuth, async (req, res) => {
       const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
       if (!profile) return res.json([]);
       where.technicianId = profile.id;
-    } else if (role === "manager") {
-      const properties = await prisma.property.findMany({
-        where: { managerId: userId },
-        select: { id: true },
-      });
-      where.propertyId = { in: properties.map((p) => p.id) };
     }
+    // manager sees all org requests (just { organizationId: orgId })
 
     const requests = await prisma.maintenanceRequest.findMany({
       where,
@@ -81,9 +79,16 @@ router.post("/requests", requireRole("resident"), async (req, res) => {
       return res.status(400).json({ error: "جميع الحقول مطلوبة" });
     }
 
-    const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    // Check unit belongs to resident and same org
+    const unit = await prisma.unit.findFirst({
+      where: { id: unitId },
+      include: { property: { select: { organizationId: true } } },
+    });
     if (!unit || unit.residentId !== req.session.userId) {
       return res.status(403).json({ error: "لا يمكنك إرسال بلاغ لهذه الوحدة" });
+    }
+    if (unit.property.organizationId !== req.session.organizationId) {
+      return res.status(403).json({ error: "ليس لديك صلاحية" });
     }
 
     const request = await prisma.maintenanceRequest.create({
@@ -96,8 +101,19 @@ router.post("/requests", requireRole("resident"), async (req, res) => {
         propertyId: unit.propertyId,
         unitId,
         residentId: req.session.userId!,
+        organizationId: req.session.organizationId!,
       },
       include: includeRelations,
+    });
+
+    await logAction({
+      organizationId: req.session.organizationId!,
+      actorId: req.session.userId!,
+      actorName: req.session.userName!,
+      action: "create_request",
+      entityType: "request",
+      entityId: request.id,
+      entityLabel: request.title,
     });
 
     res.status(201).json(fmtRequest(request));
@@ -110,8 +126,9 @@ router.post("/requests", requireRole("resident"), async (req, res) => {
 // GET /api/requests/:id
 router.get("/requests/:id", requireAuth, async (req, res) => {
   try {
-    const request = await prisma.maintenanceRequest.findUnique({
-      where: { id: req.params.id },
+    const orgId = req.session.organizationId!;
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: req.params.id, organizationId: orgId },
       include: includeRelations,
     });
     if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
@@ -119,7 +136,6 @@ router.get("/requests/:id", requireAuth, async (req, res) => {
     const role = req.session.userRole!;
     const userId = req.session.userId!;
 
-    // Authorization
     if (role === "resident" && request.residentId !== userId) {
       return res.status(403).json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
     }
@@ -142,10 +158,10 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
   try {
     const role = req.session.userRole!;
     const userId = req.session.userId!;
+    const orgId = req.session.organizationId!;
 
-    const existing = await prisma.maintenanceRequest.findUnique({
-      where: { id: req.params.id },
-      include: { property: { select: { managerId: true } } },
+    const existing = await prisma.maintenanceRequest.findFirst({
+      where: { id: req.params.id, organizationId: orgId },
     });
     if (!existing) return res.status(404).json({ error: "البلاغ غير موجود" });
 
@@ -154,7 +170,6 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
       title?: string; description?: string;
     };
 
-    // Role-based access
     if (role === "resident") {
       if (existing.residentId !== userId) {
         return res.status(403).json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
@@ -174,12 +189,6 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
       }
     }
 
-    if (role === "manager") {
-      if (existing.property.managerId !== userId) {
-        return res.status(403).json({ error: "ليس لديك صلاحية تعديل هذا البلاغ" });
-      }
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {};
     if (status) updateData.status = status;
@@ -194,6 +203,22 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
       include: includeRelations,
     });
 
+    // Audit log for significant changes (manager actions)
+    if (role === "manager") {
+      if (status && status !== existing.status) {
+        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_status", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.status, to: status } });
+      }
+      if (priority && priority !== existing.priority) {
+        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_priority", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.priority, to: priority } });
+      }
+      if (technicianId !== undefined && technicianId !== existing.technicianId) {
+        await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "assign_technician", entityType: "request", entityId: existing.id, entityLabel: existing.title });
+      }
+    }
+    if (role === "technician" && status && status !== existing.status) {
+      await logAction({ organizationId: orgId, actorId: userId, actorName: req.session.userName!, action: "change_status", entityType: "request", entityId: existing.id, entityLabel: existing.title, details: { from: existing.status, to: status } });
+    }
+
     res.json(fmtRequest(request));
   } catch (err) {
     req.log.error(err);
@@ -204,10 +229,16 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
 // GET /api/requests/:requestId/comments
 router.get("/requests/:requestId/comments", requireAuth, async (req, res) => {
   try {
-    const request = await prisma.maintenanceRequest.findUnique({
-      where: { id: req.params.requestId },
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
     });
     if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
+
+    const role = req.session.userRole!;
+    const userId = req.session.userId!;
+    if (role === "resident" && request.residentId !== userId) {
+      return res.status(403).json({ error: "ليس لديك صلاحية" });
+    }
 
     const comments = await prisma.requestComment.findMany({
       where: { requestId: req.params.requestId },
@@ -215,16 +246,15 @@ router.get("/requests/:requestId/comments", requireAuth, async (req, res) => {
       orderBy: { createdAt: "asc" },
     });
 
-    res.json(
-      comments.map((c) => ({
-        id: c.id,
-        content: c.content,
-        requestId: c.requestId,
-        authorId: c.authorId,
-        authorName: c.author.name,
-        createdAt: c.createdAt.toISOString(),
-      })),
-    );
+    res.json(comments.map((c) => ({
+      id: c.id,
+      content: c.content,
+      requestId: c.requestId,
+      authorId: c.authorId,
+      authorName: c.author.name,
+      authorRole: c.author.role,
+      createdAt: c.createdAt.toISOString(),
+    })));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "خطأ في الخادم" });
@@ -241,20 +271,25 @@ router.post("/requests/:requestId/comments", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "محتوى التعليق مطلوب" });
     }
 
-    const request = await prisma.maintenanceRequest.findUnique({
-      where: { id: req.params.requestId },
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
     });
     if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
 
-    // Residents can only comment on their own requests
     const role = req.session.userRole!;
     if (role === "resident" && request.residentId !== userId) {
       return res.status(403).json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
     }
+    if (role === "technician") {
+      const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
+      if (!profile || request.technicianId !== profile.id) {
+        return res.status(403).json({ error: "ليس لديك صلاحية التعليق على هذا البلاغ" });
+      }
+    }
 
     const comment = await prisma.requestComment.create({
       data: { content: content.trim(), requestId: req.params.requestId, authorId: userId },
-      include: { author: { select: { name: true } } },
+      include: { author: { select: { name: true, role: true } } },
     });
 
     res.status(201).json({
@@ -263,8 +298,43 @@ router.post("/requests/:requestId/comments", requireAuth, async (req, res) => {
       requestId: comment.requestId,
       authorId: comment.authorId,
       authorName: comment.author.name,
+      authorRole: comment.author.role,
       createdAt: comment.createdAt.toISOString(),
     });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+});
+
+// GET /api/requests/:requestId/attachments
+router.get("/requests/:requestId/attachments", requireAuth, async (req, res) => {
+  try {
+    const request = await prisma.maintenanceRequest.findFirst({
+      where: { id: req.params.requestId, organizationId: req.session.organizationId! },
+    });
+    if (!request) return res.status(404).json({ error: "البلاغ غير موجود" });
+
+    const role = req.session.userRole!;
+    const userId = req.session.userId!;
+    if (role === "resident" && request.residentId !== userId) {
+      return res.status(403).json({ error: "ليس لديك صلاحية" });
+    }
+
+    const attachments = await prisma.requestAttachment.findMany({
+      where: { requestId: req.params.requestId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.json(attachments.map((a) => ({
+      id: a.id,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      sizeBytes: a.sizeBytes,
+      attachmentType: a.attachmentType,
+      url: getFileUrl(a.filePath),
+      createdAt: a.createdAt.toISOString(),
+    })));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "خطأ في الخادم" });

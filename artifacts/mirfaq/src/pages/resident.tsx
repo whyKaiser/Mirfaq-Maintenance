@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { Plus, X, Clock, RefreshCcw, CheckCircle2, LogOut, Send, MessageSquare } from 'lucide-react';
+import { Plus, X, Clock, RefreshCcw, CheckCircle2, LogOut, Send, MessageSquare, Paperclip, Upload, Trash2, Image } from 'lucide-react';
 import {
   useGetRequests,
   useCreateRequest,
@@ -129,6 +129,108 @@ function RequestCard({ req }: { req: MaintenanceRequest }) {
   );
 }
 
+function AttachmentUploader({ requestId, onDone }: { requestId: string; onDone: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
+  const [error, setError] = useState('');
+
+  function handleFiles(picked: FileList | null) {
+    if (!picked) return;
+    const arr = Array.from(picked).slice(0, 3 - files.length);
+    setFiles(prev => [...prev, ...arr].slice(0, 3));
+    setError('');
+  }
+
+  async function handleUpload() {
+    if (files.length === 0) { onDone(); return; }
+    setIsUploading(true); setError('');
+    try {
+      const fd = new FormData();
+      files.forEach(f => fd.append('files', f));
+      fd.append('attachmentType', 'initial');
+      const res = await fetch(`/api/requests/${requestId}/attachments`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? 'فشل الرفع');
+      }
+      setUploaded(true);
+      setTimeout(onDone, 1500);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ');
+    }
+    setIsUploading(false);
+  }
+
+  if (uploaded) return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+      <Upload className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+      <p className="text-sm font-medium text-emerald-700">تم رفع الصور بنجاح!</p>
+    </div>
+  );
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+      <div className="flex items-center gap-2">
+        <Paperclip className="w-4 h-4 text-primary" />
+        <p className="text-sm font-semibold">أضف صوراً للمشكلة (اختياري)</p>
+        <span className="text-xs text-muted-foreground">حتى 3 صور</span>
+      </div>
+
+      {files.length < 3 && (
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="w-full border-2 border-dashed border-primary/30 rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:bg-primary/5 transition-colors"
+        >
+          <Image className="w-4 h-4" />
+          اختر صوراً (JPEG / PNG / WebP)
+        </button>
+      )}
+      <input
+        ref={fileRef}
+        type="file" multiple accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={e => handleFiles(e.target.files)}
+      />
+
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((f, i) => (
+            <div key={i} className="flex items-center gap-1.5 bg-muted rounded-lg px-2.5 py-1.5 text-xs">
+              <Image className="w-3 h-3 text-muted-foreground" />
+              <span className="max-w-24 truncate">{f.name}</span>
+              <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleUpload}
+          disabled={isUploading}
+          className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+        >
+          {isUploading && <span className="w-3.5 h-3.5 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />}
+          {files.length === 0 ? 'تخطّي' : 'رفع الصور'}
+        </button>
+        <button onClick={onDone} className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-muted transition-colors">
+          لاحقاً
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ResidentContent() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -137,19 +239,22 @@ function ResidentContent() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('كهرباء');
   const [priority, setPriority] = useState('عادي');
+  const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const { data: requests = [], isLoading } = useGetRequests();
 
   const { mutate: createRequest, isPending: isCreating } = useCreateRequest({
     mutation: {
-      onSuccess() {
+      onSuccess(newRequest) {
         qc.invalidateQueries({ queryKey: getGetRequestsQueryKey() });
         setShowForm(false);
         setTitle('');
         setDescription('');
         setCategory('كهرباء');
         setPriority('عادي');
+        // Show uploader for initial attachments
+        setPendingUploadId(newRequest.id);
       }
     }
   });
@@ -199,17 +304,27 @@ function ResidentContent() {
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
+        {/* Attachment uploader — shown after request created */}
+        {pendingUploadId && (
+          <AttachmentUploader
+            requestId={pendingUploadId}
+            onDone={() => setPendingUploadId(null)}
+          />
+        )}
+
         {/* New Request Button */}
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-medium"
-        >
-          {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {showForm ? 'إلغاء' : 'بلاغ صيانة جديد'}
-        </button>
+        {!pendingUploadId && (
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-medium"
+          >
+            {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showForm ? 'إلغاء' : 'بلاغ صيانة جديد'}
+          </button>
+        )}
 
         {/* New Request Form */}
-        {showForm && (
+        {showForm && !pendingUploadId && (
           <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2 duration-200">
             <h2 className="font-bold text-base">تفاصيل البلاغ</h2>
 

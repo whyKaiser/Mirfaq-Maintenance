@@ -4,11 +4,11 @@ import { prisma } from "../lib/prisma";
 
 const router = Router();
 
-// GET /api/residents  (manager-only – used to populate unit resident picker)
+// GET /api/residents  (manager-only, org-isolated – used for unit resident picker)
 router.get("/residents", requireRole("manager"), async (req, res) => {
   try {
     const residents = await prisma.user.findMany({
-      where: { role: "resident" },
+      where: { role: "resident", organizationId: req.session.organizationId!, isActive: true },
       include: { residentUnit: { select: { id: true, number: true } } },
       orderBy: { name: "asc" },
     });

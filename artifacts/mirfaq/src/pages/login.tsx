@@ -27,7 +27,8 @@ export default function LoginPage() {
   const { mutate: login, isPending } = useLogin({
     mutation: {
       onSuccess(user) {
-        setUser(user);
+        // Backend always returns organizationName and brandColor; cast is safe
+        setUser(user as import('@/context/AuthContext').ExtAuthUser);
         setLocation(ROLE_PATHS[user.role] ?? '/login');
       },
       onError() {

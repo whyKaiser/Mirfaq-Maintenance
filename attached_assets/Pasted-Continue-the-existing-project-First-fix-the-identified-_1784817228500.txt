@@ -1,0 +1,118 @@
+Continue the existing "مِرفق" project. First fix the identified bug, then implement Phase 3 only.
+
+Strict constraints:
+- Preserve the current Arabic RTL design and existing functionality.
+- Do not redesign the landing page or dashboards.
+- Do not use paid services, Replit Database, Replit Auth, Replit App Storage, or external APIs.
+- Do not change the current architecture or package manager.
+- Keep Prisma + SQLite for the demo.
+- Keep the project portable and runnable outside Replit.
+- Avoid unnecessary dependencies.
+- Do not implement payments, AI, maps, SMS, or email.
+- Do not begin features outside this prompt.
+- Protect all data and permissions on the server, not only in the interface.
+
+Part 1 — Fix existing React error:
+Fix this console error:
+
+Cannot update a component (`ProtectedRoute`) while rendering a different component (`ProtectedRoute`).
+
+Move navigation or state updates out of the render phase into the correct effect or router redirect mechanism. Verify unauthorized access to /manager, /resident, and /technician. Confirm the console no longer shows this error.
+
+Part 2 — Make the product sellable to individual property-management clients:
+
+1. Organization model:
+- Add an Organization model.
+- Every user, property, unit, maintenance request, technician, and comment must belong to an organization.
+- Seed one demo organization named "شركة مِرفق لإدارة العقارات".
+- Migrate all current demo data into it.
+- Enforce organization isolation on every API route.
+- Users must never access another organization’s data.
+
+2. Company settings:
+Create a working manager settings page containing:
+- Company name
+- Commercial registration number, optional
+- Phone, optional
+- City
+- Brand color
+- Logo URL, optional
+- Save settings
+- Reflect company name and brand color in the manager dashboard and printable reports.
+
+Do not implement file upload for the logo yet.
+
+3. User management:
+Add a manager page named "المستخدمون".
+Manager can:
+- List residents and technicians.
+- Create a resident or technician account.
+- Edit name, phone, email, and role-specific information.
+- Assign a resident to an available unit.
+- Activate or deactivate an account.
+- Generate a temporary password locally.
+- Never display stored password hashes.
+- Prevent a manager from deactivating their own account.
+
+No email invitation or external service.
+
+4. Maintenance request attachments:
+- Allow resident to attach up to 3 images when creating a request.
+- Allow technician to attach up to 3 completion images.
+- Accept JPEG, PNG, and WebP only.
+- Maximum 3 MB per image.
+- Validate MIME type and size on the server.
+- Store files locally in development through a dedicated storage service abstraction.
+- Store only attachment metadata and path in the database.
+- Document clearly how local storage can later be replaced with S3-compatible storage.
+- Prevent access to attachments belonging to another organization.
+
+5. Printable reports:
+Add a print-friendly Arabic report without using a paid PDF API:
+- Individual maintenance request work order.
+- Monthly maintenance summary.
+- Company branding.
+- Property, unit, resident, technician, dates, status, priority, comments, and attachments.
+- Print and "Save as PDF" through the browser.
+- Add correct Arabic print CSS.
+
+6. Audit log:
+Record:
+- Request creation
+- Technician assignment
+- Status changes
+- Priority changes
+- Property and unit creation
+- User creation or deactivation
+Show a manager-only audit page with date, user, action, and related record.
+
+7. UX:
+- Add "المستخدمون" and "سجل العمليات" to manager navigation.
+- Add useful Arabic success and error messages.
+- Add confirmation before destructive actions.
+- Add loading and empty states.
+- Preserve mobile responsiveness.
+
+8. Verification:
+Test this complete workflow:
+- Manager login
+- Create property and unit
+- Create resident and assign unit
+- Resident login and create request with an image
+- Manager assigns technician
+- Technician adds comment, completion image, and completes request
+- Resident sees completion and comment
+- Manager prints work order and monthly report
+- Data remains after refresh
+- Cross-role and cross-organization access is rejected
+- No React console errors
+- Production build succeeds
+
+Update Prisma migrations, seed data, .env.example, and README.md. Document local file storage limitations and migration to PostgreSQL and S3-compatible storage.
+
+Do not publish the application. Stop after testing. Report:
+- Files changed
+- Database migration created
+- Routes tested
+- Security checks tested
+- Remaining issues

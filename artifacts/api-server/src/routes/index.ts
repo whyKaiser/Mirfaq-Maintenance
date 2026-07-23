@@ -7,6 +7,11 @@ import requestsRouter from "./requests";
 import techniciansRouter from "./technicians";
 import dashboardRouter from "./dashboard";
 import residentsRouter from "./residents";
+import settingsRouter from "./settings";
+import usersRouter from "./users";
+import attachmentsRouter from "./attachments";
+import auditLogRouter from "./audit-log";
+import reportsRouter from "./reports";
 
 const router: IRouter = Router();
 
@@ -18,5 +23,10 @@ router.use(requestsRouter);
 router.use(techniciansRouter);
 router.use(dashboardRouter);
 router.use(residentsRouter);
+router.use(settingsRouter);
+router.use(usersRouter);
+router.use(attachmentsRouter);
+router.use(auditLogRouter);
+router.use(reportsRouter);
 
 export default router;

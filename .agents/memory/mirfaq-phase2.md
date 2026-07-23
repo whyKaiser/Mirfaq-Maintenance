@@ -1,40 +1,50 @@
 ---
-name: Mirfaq Phase 2 Architecture
-description: Key decisions for the مِرفق backend and auth integration
+name: Mirfaq Phase 2 & 3 Architecture
+description: Key decisions for the مِرفق SaaS — DB, auth, API, multi-tenancy, uploads, print pages
 ---
 
-## DATABASE_URL is runtime-managed
-DATABASE_URL is reserved by Replit (PostgreSQL). Do NOT use it for SQLite.
-Use `MIRFAQ_DB_URL=file:./dev.db` (set via setEnvVars shared). The Prisma schema uses `env("MIRFAQ_DB_URL")`.
+## DB
+- SQLite via `MIRFAQ_DB_URL=file:./dev.db` (Replit reserves `DATABASE_URL` for Postgres — never use it)
+- Prisma 6, schema at `artifacts/api-server/prisma/schema.prisma`
+- Seed: `cd artifacts/api-server && pnpm db:seed` — demo org `"org-demo"`, password `Demo123!`
+- Reset: `rm -rf prisma/migrations prisma/dev.db && npx prisma migrate dev --name <name>`
 
-**Why:** Replit blocks writing .env files and reserves DATABASE_URL for its managed PostgreSQL.
+## Auth / Session
+- express-session (MemoryStore), 7-day TTL
+- Session fields: `userId`, `userRole`, `organizationId`, `organizationName`
+- `credentials: "include"` in `lib/api-client-react/src/custom-fetch.ts` for cross-origin cookies
+- Inactive users rejected at login; existing sessions survive until expiry
 
-## Prisma SQLite path resolution
-`file:./dev.db` in schema.prisma resolves relative to the schema file location:
-`artifacts/api-server/prisma/schema.prisma` → DB at `artifacts/api-server/prisma/dev.db`.
+## API contract
+- OpenAPI spec: `lib/api-spec/openapi.yaml`
+- Orval regeneration: `cd lib/api-spec && pnpm exec orval`
+- Generated hooks: `lib/api-client-react/src/generated/api.ts`
 
-**Why:** Prisma SQLite paths are always relative to the schema file, not process.cwd().
+## Multi-tenancy (Phase 3)
+- Every query scoped by `req.session.organizationId` — never cross-org leakage
+- `ExtAuthUser = AuthUser & { organizationName: string; brandColor: string }` in AuthContext
+- Generated `AuthUser` now includes `organizationId`, `organizationName?`, `brandColor?` (after Orval regen)
+- Cast in login.tsx: `setUser(user as ExtAuthUser)` is safe — backend always returns these fields
 
-## API routing
-The Replit proxy routes `/api/*` to the api-server (port 8080). The frontend at `/` calls `/api/...` directly — no setBaseUrl needed. The proxy handles routing transparently.
+## File uploads
+- multer installed; JPEG/PNG/WebP only, 3 MB max, 3 files max per upload
+- `UPLOAD_DIR` in `artifacts/api-server/src/lib/storage.ts`
+- Routes: `POST /api/requests/:id/attachments`, `DELETE /api/attachments/:id`, `GET /api/files/:filename`
+- `attachmentType`: `"initial"` (resident on submit) or `"completion"` (technician on complete)
 
-## Session auth flow
-- express-session with MemoryStore (resets on restart — acceptable for demo)
-- SESSION_SECRET available as Replit secret
-- credentials: "include" added to custom-fetch.ts for browser session cookies
-- Session augmented via src/types/session.d.ts (userId, userRole, userName, userEmail)
+## Print pages
+- `GET /api/reports/work-order/:id` → `print-work-order.tsx` (auto-triggers window.print after 600ms)
+- `GET /api/reports/monthly?year&month` → `print-monthly.tsx` (landscape A4)
+- Both pages require active session cookie — opened in new tab from manager dashboard
 
-## Frontend auth pattern
-- AuthContext wraps the app inside QueryClientProvider
-- ProtectedRoute uses useGetMe (retry:false, enabled: !user) for auth check
-- On 401, redirects to /login
-- Login page fills form from demo account cards, calls useLogin mutation, setUser + navigate
+## Manager dashboard (Phase 3 nav)
+- 8 nav items: dashboard, properties, units, requests, technicians, users, audit, settings
+- Sidebar header uses `user.brandColor` as background
+- Print button on each request row → `/print/work-order/:id`
+- Monthly report button in RequestsView header
 
-## Orval/Zod version incompatibility
-Orval generates `zod.email()` for `format: email` fields — this is Zod v4 syntax.
-Project uses Zod v3 which requires `zod.string().email()`.
-**Fix:** Remove `format: email` from any OpenAPI string fields in openapi.yaml.
+## Routing
+- Replit proxy: `/api/*` → port 8080 (api-server), `/` → port 23085 (frontend/mirfaq)
+- Print pages registered in `App.tsx` at `/print/work-order/:requestId` and `/print/monthly`
 
-## Dev script includes prisma generate
-`"dev": "export NODE_ENV=development && prisma generate && pnpm run build && pnpm run start"`
-Ensures Prisma client is always fresh on workflow restart.
+**Why:** MIRFAQ_DB_URL avoids Replit's Postgres reservation; credentials:include is required because the Vite dev server and API run on different ports in development.

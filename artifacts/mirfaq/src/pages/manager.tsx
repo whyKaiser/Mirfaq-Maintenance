@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard, Wrench, Users, Settings, LogOut,
   Search, ChevronLeft, Clock, CheckCircle2, RefreshCcw,
   Building2, Home, Plus, Pencil, Trash2, X, AlertTriangle,
+  Eye, EyeOff, Copy, Check, Shield, ClipboardList,
+  Printer, UserCheck, UserX, Palette, Phone,
 } from 'lucide-react';
 import {
   useGetDashboardStats,
@@ -31,12 +33,43 @@ import type {
   Property,
   Unit,
 } from '@workspace/api-client-react';
+
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  phone?: string | null;
+  unitNumber?: string | null;
+  specialty?: string | null;
+  createdAt: string;
+}
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  actorName: string;
+  entityType: string;
+  entityLabel?: string | null;
+  details?: string | null;
+  createdAt: string;
+}
+
+interface OrgSettings {
+  id: string;
+  name: string;
+  crNumber?: string | null;
+  phone?: string | null;
+  city: string;
+  brandColor: string;
+}
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'technicians';
+type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'technicians' | 'users' | 'audit' | 'settings';
 
 interface ResidentUser {
   id: string;
@@ -339,6 +372,467 @@ function RequestDetailModal({
             إلغاء
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── settings view ─────────────────────────────────────────────────────────────
+
+function SettingsView() {
+  const [settings, setSettings] = useState<OrgSettings | null>(null);
+  const [name, setName] = useState('');
+  const [crNumber, setCrNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [brandColor, setBrandColor] = useState('#0891b2');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/settings', { credentials: 'include' })
+      .then(r => r.json())
+      .then((d: OrgSettings) => {
+        setSettings(d);
+        setName(d.name ?? '');
+        setCrNumber(d.crNumber ?? '');
+        setPhone(d.phone ?? '');
+        setCity(d.city ?? '');
+        setBrandColor(d.brandColor ?? '#0891b2');
+        setIsLoading(false);
+      })
+      .catch(() => { setError('تعذّر تحميل الإعدادات'); setIsLoading(false); });
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !city.trim()) return;
+    setIsSaving(true);
+    setError('');
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: name.trim(), crNumber: crNumber.trim() || null, phone: phone.trim() || null, city: city.trim(), brandColor }),
+      });
+      if (!res.ok) throw new Error();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError('فشل الحفظ — حاول مجدداً');
+    }
+    setIsSaving(false);
+  }
+
+  if (isLoading) return (
+    <div className="space-y-4 animate-in fade-in">
+      {[1,2,3,4].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-2xl" />)}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300 max-w-lg">
+      <div>
+        <h1 className="text-2xl font-bold">إعدادات الشركة</h1>
+        <p className="text-muted-foreground text-sm mt-1">معلومات المنشأة وهوية العلامة التجارية</p>
+      </div>
+
+      <form onSubmit={handleSave} className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">اسم الشركة <span className="text-destructive">*</span></label>
+          <input
+            value={name} onChange={e => setName(e.target.value)} required
+            className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">المدينة <span className="text-destructive">*</span></label>
+            <input
+              value={city} onChange={e => setCity(e.target.value)} required
+              placeholder="الرياض"
+              className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium flex items-center gap-1"><Phone className="w-3.5 h-3.5" />الهاتف</label>
+            <input
+              value={phone} onChange={e => setPhone(e.target.value)} dir="ltr"
+              placeholder="+966 5x xxx xxxx"
+              className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">رقم السجل التجاري</label>
+          <input
+            value={crNumber} onChange={e => setCrNumber(e.target.value)} dir="ltr"
+            placeholder="10xxxxxxxxx"
+            className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium flex items-center gap-1.5"><Palette className="w-3.5 h-3.5" />لون العلامة التجارية</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color" value={brandColor} onChange={e => setBrandColor(e.target.value)}
+              className="w-12 h-10 rounded-xl border border-input cursor-pointer p-0.5 bg-background"
+            />
+            <input
+              value={brandColor} onChange={e => setBrandColor(e.target.value)} dir="ltr"
+              placeholder="#0891b2"
+              className="flex-1 px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
+            />
+            <div className="w-10 h-10 rounded-xl border border-border flex-shrink-0" style={{ backgroundColor: brandColor }} />
+          </div>
+          <p className="text-xs text-muted-foreground">يُطبَّق على لوحة التحكم عند إعادة الدخول</p>
+        </div>
+
+        {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+
+        <button
+          type="submit" disabled={isSaving || !name.trim() || !city.trim()}
+          className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+        >
+          {isSaving && <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />}
+          {saved ? <><Check className="w-4 h-4" />تم الحفظ</> : 'حفظ الإعدادات'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ─── users view ────────────────────────────────────────────────────────────────
+
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('resident');
+  const [phone, setPhone] = useState('');
+  const [specialty, setSpecialty] = useState('كهرباء');
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState('');
+  const [createdPwd, setCreatedPwd] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const tempPwd = useRef(generateTempPassword());
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsPending(true); setError('');
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: name.trim(), email: email.trim(), role,
+          password: tempPwd.current,
+          phone: phone.trim() || undefined,
+          specialty: role === 'technician' ? specialty : undefined,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? 'فشل الإنشاء');
+      setCreatedPwd(tempPwd.current);
+      onCreated();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ');
+      setIsPending(false);
+    }
+  }
+
+  function copyPwd() {
+    navigator.clipboard.writeText(createdPwd);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (createdPwd) return (
+    <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+          <CheckCircle2 className="w-6 h-6" />
+        </div>
+        <div className="text-center">
+          <h2 className="font-bold text-lg">تم إنشاء الحساب</h2>
+          <p className="text-sm text-muted-foreground mt-1">سلّم كلمة المرور المؤقتة هذه للمستخدم مباشرةً</p>
+        </div>
+        <div className="bg-muted rounded-xl p-3 flex items-center gap-3">
+          <code className="flex-1 text-sm font-mono font-bold tracking-widest" dir="ltr">{createdPwd}</code>
+          <button onClick={copyPwd} className="text-primary hover:text-primary/80 transition-colors">
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          </button>
+        </div>
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">
+          ⚠️ لن تظهر هذه الكلمة مجدداً — احفظها الآن
+        </p>
+        <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+          تم، أغلق
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-border">
+          <h2 className="font-bold">إضافة مستخدم جديد</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">الاسم الكامل</label>
+            <input value={name} onChange={e => setName(e.target.value)} required
+              className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">البريد الإلكتروني</label>
+            <input value={email} onChange={e => setEmail(e.target.value)} type="email" required dir="ltr"
+              className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">الدور</label>
+              <select value={role} onChange={e => setRole(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="resident">ساكن</option>
+                <option value="technician">فني</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">الهاتف</label>
+              <input value={phone} onChange={e => setPhone(e.target.value)} dir="ltr"
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+          </div>
+          {role === 'technician' && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">التخصص</label>
+              <select value={specialty} onChange={e => setSpecialty(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                {['كهرباء','سباكة','تكييف','نجارة','دهانات','صيانة عامة'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          {error && <p className="text-sm text-destructive bg-destructive/10 rounded-xl px-3 py-2">{error}</p>}
+        </form>
+        <div className="flex gap-3 p-5 border-t border-border">
+          <button
+            type="button" onClick={handleSubmit as unknown as React.MouseEventHandler}
+            disabled={isPending || !name.trim() || !email.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {isPending && <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />}
+            إنشاء الحساب
+          </button>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UsersView() {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [filterRole, setFilterRole] = useState<string>('all');
+
+  async function loadUsers() {
+    const res = await fetch('/api/users', { credentials: 'include' });
+    const data = await res.json() as UserRow[];
+    setUsers(data);
+    setIsLoading(false);
+  }
+
+  useEffect(() => { loadUsers(); }, []);
+
+  async function toggleActive(u: UserRow) {
+    setTogglingId(u.id);
+    await fetch(`/api/users/${u.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ isActive: !u.isActive }),
+    });
+    await loadUsers();
+    setTogglingId(null);
+  }
+
+  const ROLE_LABELS: Record<string, string> = { resident: 'ساكن', technician: 'فني', manager: 'مدير' };
+
+  const filtered = filterRole === 'all' ? users : users.filter(u => u.role === filterRole);
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-300">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">المستخدمون</h1>
+          <p className="text-muted-foreground text-sm mt-1">إدارة حسابات السكان والفنيين</p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          مستخدم جديد
+        </button>
+      </div>
+
+      {/* Role filter */}
+      <div className="flex gap-2">
+        {[['all','الكل'],['resident','السكان'],['technician','الفنيون'],['manager','المديرون']].map(([v,l]) => (
+          <button key={v} onClick={() => setFilterRole(v)}
+            className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border ${
+              filterRole === v ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-primary/40'
+            }`}>{l}</button>
+        ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        {isLoading ? (
+          <div className="divide-y divide-border">
+            {[1,2,3,4].map(i => <div key={i} className="p-4 animate-pulse h-16" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">لا يوجد مستخدمون في هذا التصنيف</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/40 text-xs font-medium text-muted-foreground">
+              <span className="col-span-4">الاسم</span>
+              <span className="col-span-3">البريد</span>
+              <span className="col-span-2">الدور</span>
+              <span className="col-span-2">الوحدة / التخصص</span>
+              <span className="col-span-1" />
+            </div>
+            {filtered.map(u => (
+              <div key={u.id} className={`grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-muted/20 transition-colors ${!u.isActive ? 'opacity-50' : ''}`}>
+                <div className="col-span-4 flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center flex-shrink-0">
+                    {u.name[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{u.name}</p>
+                    {!u.isActive && <span className="text-xs text-destructive">معطّل</span>}
+                  </div>
+                </div>
+                <span className="col-span-3 text-xs text-muted-foreground truncate" dir="ltr">{u.email}</span>
+                <span className="col-span-2">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                    u.role === 'manager' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                    u.role === 'technician' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    'bg-emerald-100 text-emerald-700 border-emerald-200'
+                  }`}>{ROLE_LABELS[u.role] ?? u.role}</span>
+                </span>
+                <span className="col-span-2 text-xs text-muted-foreground truncate">
+                  {u.unitNumber ?? u.specialty ?? '—'}
+                </span>
+                <div className="col-span-1 flex justify-end">
+                  <button
+                    onClick={() => toggleActive(u)}
+                    disabled={togglingId === u.id}
+                    title={u.isActive ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                    className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                      u.isActive
+                        ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                        : 'text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {u.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showCreate && (
+        <CreateUserModal
+          onClose={() => setShowCreate(false)}
+          onCreated={loadUsers}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── audit view ────────────────────────────────────────────────────────────────
+
+function AuditView() {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/audit', { credentials: 'include' })
+      .then(r => r.json())
+      .then((d: AuditEntry[]) => { setEntries(d); setIsLoading(false); })
+      .catch(() => setIsLoading(false));
+  }, []);
+
+  const ENTITY_LABELS: Record<string, string> = {
+    Property: 'عقار', Unit: 'وحدة', MaintenanceRequest: 'بلاغ',
+    RequestAttachment: 'مرفق', User: 'مستخدم', Organization: 'منشأة',
+  };
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-300">
+      <div>
+        <h1 className="text-2xl font-bold">سجل العمليات</h1>
+        <p className="text-muted-foreground text-sm mt-1">آخر 200 عملية في المنصة</p>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        {isLoading ? (
+          <div className="divide-y divide-border">
+            {[1,2,3,4,5].map(i => <div key={i} className="p-4 animate-pulse h-14" />)}
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">لا توجد سجلات بعد</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/40 text-xs font-medium text-muted-foreground">
+              <span className="col-span-3">العملية</span>
+              <span className="col-span-2">المنفِّذ</span>
+              <span className="col-span-2">النوع</span>
+              <span className="col-span-3">الكيان</span>
+              <span className="col-span-2">التاريخ</span>
+            </div>
+            {entries.map(e => (
+              <div key={e.id} className="grid grid-cols-12 gap-3 px-4 py-3 items-start hover:bg-muted/20 transition-colors">
+                <div className="col-span-3">
+                  <span className="text-xs font-medium bg-muted rounded-lg px-2 py-0.5">{e.action}</span>
+                </div>
+                <span className="col-span-2 text-sm text-foreground">{e.actorName}</span>
+                <span className="col-span-2 text-xs text-muted-foreground">{ENTITY_LABELS[e.entityType] ?? e.entityType}</span>
+                <span className="col-span-3 text-xs text-muted-foreground truncate">{e.entityLabel ?? '—'}</span>
+                <span className="col-span-2 text-xs text-muted-foreground" dir="ltr">
+                  {new Date(e.createdAt).toLocaleDateString('ar-SA', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -683,6 +1177,7 @@ function RequestsView({
   refetchReq: () => void;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const now = new Date();
   const filtered = requests.filter(r =>
     r.title.includes(searchQuery) ||
     (r.residentName ?? '').includes(searchQuery) ||
@@ -697,10 +1192,21 @@ function RequestsView({
           <h1 className="text-2xl font-bold">البلاغات</h1>
           <p className="text-muted-foreground text-sm mt-1">إدارة جميع بلاغات الصيانة</p>
         </div>
-        <button onClick={refetchReq} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <RefreshCcw className="w-4 h-4" />
-          تحديث
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/print/monthly?year=${now.getFullYear()}&month=${now.getMonth() + 1}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Printer className="w-4 h-4" />
+            تقرير شهري
+          </a>
+          <button onClick={refetchReq} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-xl border border-border hover:bg-muted">
+            <RefreshCcw className="w-4 h-4" />
+            تحديث
+          </button>
+        </div>
       </div>
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -745,7 +1251,19 @@ function RequestsView({
                       {req.residentName} · {req.unitNumber} · {req.category}
                     </p>
                   </div>
-                  <ChevronLeft className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <a
+                      href={`/print/work-order/${req.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      title="طباعة أمر العمل"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                    </a>
+                    <ChevronLeft className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -759,7 +1277,7 @@ function RequestsView({
 // ─── main manager content ──────────────────────────────────────────────────────
 
 function ManagerContent() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as { user: import('@/context/AuthContext').ExtAuthUser | null; logout: () => void };
   const [, setLocation] = useLocation();
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard');
   const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null);
@@ -789,11 +1307,14 @@ function ManagerContent() {
   });
 
   const navItems: { id: NavSection; label: string; icon: React.ElementType }[] = [
-    { id: 'dashboard',   label: 'لوحة التحكم', icon: LayoutDashboard },
-    { id: 'properties',  label: 'العقارات',     icon: Building2 },
-    { id: 'units',       label: 'الوحدات',      icon: Home },
-    { id: 'requests',    label: 'البلاغات',     icon: Wrench },
-    { id: 'technicians', label: 'الفنيون',      icon: Users },
+    { id: 'dashboard',   label: 'لوحة التحكم',    icon: LayoutDashboard },
+    { id: 'properties',  label: 'العقارات',        icon: Building2 },
+    { id: 'units',       label: 'الوحدات',         icon: Home },
+    { id: 'requests',    label: 'البلاغات',        icon: Wrench },
+    { id: 'technicians', label: 'الفنيون',         icon: Users },
+    { id: 'users',       label: 'المستخدمون',      icon: Shield },
+    { id: 'audit',       label: 'سجل العمليات',    icon: ClipboardList },
+    { id: 'settings',    label: 'إعدادات الشركة',  icon: Settings },
   ];
 
   return (
@@ -801,12 +1322,12 @@ function ManagerContent() {
 
       {/* Sidebar */}
       <aside className="w-64 bg-card border-l border-border flex flex-col fixed inset-y-0 right-0 z-10">
-        <div className="p-5 border-b border-border">
+        <div className="p-5 border-b border-border" style={{ backgroundColor: user?.brandColor ?? '#0891b2' }}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shadow-sm">م</div>
+            <div className="w-10 h-10 rounded-xl bg-white/20 text-white font-bold text-xl flex items-center justify-center shadow-sm">م</div>
             <div>
-              <p className="font-bold text-sm text-foreground">مِرفق</p>
-              <p className="text-xs text-muted-foreground">إدارة العقارات</p>
+              <p className="font-bold text-sm text-white">{user?.organizationName ?? 'مِرفق'}</p>
+              <p className="text-xs text-white/70">إدارة العقارات</p>
             </div>
           </div>
         </div>
@@ -840,11 +1361,7 @@ function ManagerContent() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-border space-y-1">
-          <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-muted transition-colors">
-            <Settings className="w-4 h-4" />
-            الإعدادات
-          </button>
+        <div className="p-3 border-t border-border">
           <button
             onClick={() => doLogout()}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -985,6 +1502,15 @@ function ManagerContent() {
             refetchReq={refetchReq}
           />
         )}
+
+        {/* ── Users ── */}
+        {activeNav === 'users' && <UsersView />}
+
+        {/* ── Audit ── */}
+        {activeNav === 'audit' && <AuditView />}
+
+        {/* ── Settings ── */}
+        {activeNav === 'settings' && <SettingsView />}
 
         {/* ── Technicians ── */}
         {activeNav === 'technicians' && (

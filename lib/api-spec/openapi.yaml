@@ -425,7 +425,7 @@ components:
 
     AuthUser:
       type: object
-      required: [id, name, email, role]
+      required: [id, name, email, role, organizationId]
       properties:
         id:
           type: string
@@ -433,10 +433,20 @@ components:
           type: string
         email:
           type: string
+        phone:
+          type: ["string", "null"]
         role:
           type: string
+        isActive:
+          type: boolean
         unitId:
           type: ["string", "null"]
+        organizationId:
+          type: string
+        organizationName:
+          type: string
+        brandColor:
+          type: string
 
     LoginInput:
       type: object

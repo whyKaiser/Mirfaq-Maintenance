@@ -4,9 +4,25 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding مِرفق database...");
+  console.log("🌱 Seeding مِرفق database (Phase 3)...");
 
   const passwordHash = await bcrypt.hash("Demo123!", 12);
+
+  // ──────────────────────────────────────────────
+  // Demo Organization
+  // ──────────────────────────────────────────────
+  const org = await prisma.organization.upsert({
+    where: { id: "org-demo" },
+    update: {},
+    create: {
+      id: "org-demo",
+      name: "شركة مِرفق لإدارة العقارات",
+      crNumber: "1010123456",
+      phone: "+966112345678",
+      city: "الرياض",
+      brandColor: "#0891b2",
+    },
+  });
 
   // ──────────────────────────────────────────────
   // Users
@@ -17,8 +33,11 @@ async function main() {
     create: {
       name: "أحمد العمري",
       email: "manager@mirfaq.sa",
+      phone: "+966501112222",
       passwordHash,
       role: "manager",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -28,8 +47,11 @@ async function main() {
     create: {
       name: "سارة الزهراني",
       email: "resident@mirfaq.sa",
+      phone: "+966503334444",
       passwordHash,
       role: "resident",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -39,8 +61,11 @@ async function main() {
     create: {
       name: "محمد الغامدي",
       email: "technician@mirfaq.sa",
+      phone: "+966501234567",
       passwordHash,
       role: "technician",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -50,8 +75,11 @@ async function main() {
     create: {
       name: "فيصل الحربي",
       email: "faisal@mirfaq.sa",
+      phone: "+966505556666",
       passwordHash,
       role: "resident",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -61,8 +89,11 @@ async function main() {
     create: {
       name: "نورة المالكي",
       email: "nora@mirfaq.sa",
+      phone: "+966507778888",
       passwordHash,
       role: "resident",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -72,8 +103,11 @@ async function main() {
     create: {
       name: "خالد القحطاني",
       email: "khalid@mirfaq.sa",
+      phone: "+966507654321",
       passwordHash,
       role: "technician",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -83,8 +117,11 @@ async function main() {
     create: {
       name: "سلطان المطيري",
       email: "sultan@mirfaq.sa",
+      phone: "+966509871234",
       passwordHash,
       role: "technician",
+      isActive: true,
+      organizationId: org.id,
     },
   });
 
@@ -120,6 +157,7 @@ async function main() {
       name: "مجمع الياسمين السكني",
       address: "حي الياسمين، طريق الملك عبدالعزيز، الرياض",
       managerId: manager.id,
+      organizationId: org.id,
     },
   });
 
@@ -131,6 +169,7 @@ async function main() {
       name: "برج النخيل التجاري",
       address: "طريق الملك فهد، حي العليا، الرياض",
       managerId: manager.id,
+      organizationId: org.id,
     },
   });
 
@@ -140,61 +179,31 @@ async function main() {
   const unit3B = await prisma.unit.upsert({
     where: { id: "unit-3b" },
     update: {},
-    create: {
-      id: "unit-3b",
-      number: "3B",
-      floor: 3,
-      propertyId: property1.id,
-      residentId: resident.id,
-    },
+    create: { id: "unit-3b", number: "3B", floor: 3, propertyId: property1.id, residentId: resident.id },
   });
 
   const unitVilla12 = await prisma.unit.upsert({
     where: { id: "unit-villa12" },
     update: {},
-    create: {
-      id: "unit-villa12",
-      number: "فيلا 12",
-      floor: 1,
-      propertyId: property1.id,
-      residentId: resident2.id,
-    },
+    create: { id: "unit-villa12", number: "فيلا 12", floor: 1, propertyId: property1.id, residentId: resident2.id },
   });
 
   const unit7A = await prisma.unit.upsert({
     where: { id: "unit-7a" },
     update: {},
-    create: {
-      id: "unit-7a",
-      number: "7A",
-      floor: 7,
-      propertyId: property1.id,
-      residentId: resident3.id,
-    },
+    create: { id: "unit-7a", number: "7A", floor: 7, propertyId: property1.id, residentId: resident3.id },
   });
 
   await prisma.unit.upsert({
     where: { id: "unit-studio9" },
     update: {},
-    create: {
-      id: "unit-studio9",
-      number: "استوديو 9",
-      floor: 9,
-      propertyId: property2.id,
-      residentId: null,
-    },
+    create: { id: "unit-studio9", number: "استوديو 9", floor: 9, propertyId: property2.id, residentId: null },
   });
 
   await prisma.unit.upsert({
     where: { id: "unit-2c" },
     update: {},
-    create: {
-      id: "unit-2c",
-      number: "2C",
-      floor: 2,
-      propertyId: property2.id,
-      residentId: null,
-    },
+    create: { id: "unit-2c", number: "2C", floor: 2, propertyId: property2.id, residentId: null },
   });
 
   // ──────────────────────────────────────────────
@@ -214,6 +223,7 @@ async function main() {
       unitId: unit3B.id,
       residentId: resident.id,
       technicianId: techProfile.id,
+      organizationId: org.id,
     },
   });
 
@@ -231,10 +241,11 @@ async function main() {
       unitId: unit3B.id,
       residentId: resident.id,
       technicianId: techProfile2.id,
+      organizationId: org.id,
     },
   });
 
-  const req3 = await prisma.maintenanceRequest.upsert({
+  await prisma.maintenanceRequest.upsert({
     where: { id: "req-003" },
     update: {},
     create: {
@@ -248,6 +259,7 @@ async function main() {
       unitId: unit3B.id,
       residentId: resident.id,
       technicianId: null,
+      organizationId: org.id,
     },
   });
 
@@ -265,6 +277,7 @@ async function main() {
       unitId: unit7A.id,
       residentId: resident3.id,
       technicianId: null,
+      organizationId: org.id,
     },
   });
 
@@ -282,6 +295,7 @@ async function main() {
       unitId: unitVilla12.id,
       residentId: resident2.id,
       technicianId: techProfile.id,
+      organizationId: org.id,
     },
   });
 
@@ -299,6 +313,7 @@ async function main() {
       unitId: "unit-studio9",
       residentId: resident2.id,
       technicianId: techProfile2.id,
+      organizationId: org.id,
     },
   });
 
@@ -310,7 +325,7 @@ async function main() {
     update: {},
     create: {
       id: "cmt-001",
-      content: "تم الوصول للوحدة وتشخيص المشكلة. التسرب من وصلة الصنبور الداخلية. سنبدأ الإصلاح غداً صباحاً مع قطع الغيار.",
+      content: "تم الوصول للوحدة وتشخيص المشكلة. التسرب من وصلة الصنبور الداخلية. سنبدأ الإصلاح غداً صباحاً.",
       requestId: req1.id,
       authorId: techUser.id,
     },
@@ -349,11 +364,60 @@ async function main() {
     },
   });
 
+  // ──────────────────────────────────────────────
+  // Seed audit log entries
+  // ──────────────────────────────────────────────
+  await prisma.auditLog.upsert({
+    where: { id: "audit-001" },
+    update: {},
+    create: {
+      id: "audit-001",
+      organizationId: org.id,
+      actorId: manager.id,
+      actorName: manager.name,
+      action: "create_property",
+      entityType: "property",
+      entityId: property1.id,
+      entityLabel: property1.name,
+    },
+  });
+
+  await prisma.auditLog.upsert({
+    where: { id: "audit-002" },
+    update: {},
+    create: {
+      id: "audit-002",
+      organizationId: org.id,
+      actorId: resident.id,
+      actorName: resident.name,
+      action: "create_request",
+      entityType: "request",
+      entityId: req1.id,
+      entityLabel: req1.title,
+    },
+  });
+
+  await prisma.auditLog.upsert({
+    where: { id: "audit-003" },
+    update: {},
+    create: {
+      id: "audit-003",
+      organizationId: org.id,
+      actorId: manager.id,
+      actorName: manager.name,
+      action: "assign_technician",
+      entityType: "request",
+      entityId: req1.id,
+      entityLabel: req1.title,
+    },
+  });
+
   console.log("✅ Seeding complete!\n");
-  console.log("Demo accounts:");
-  console.log("  مدير العقار  : manager@mirfaq.sa    / Demo123!");
-  console.log("  الساكن       : resident@mirfaq.sa   / Demo123!");
-  console.log("  الفني        : technician@mirfaq.sa / Demo123!");
+  console.log("Demo accounts (password: Demo123!):");
+  console.log("  مدير العقار  : manager@mirfaq.sa");
+  console.log("  الساكن       : resident@mirfaq.sa");
+  console.log("  الفني        : technician@mirfaq.sa");
+  console.log(`\n  Organization : ${org.name}`);
 }
 
 main()

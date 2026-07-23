@@ -10,7 +10,13 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  /** @nullable */
+  phone?: string | null;
   role: string;
+  isActive?: boolean;
   /** @nullable */
   unitId?: string | null;
+  organizationId: string;
+  organizationName?: string;
+  brandColor?: string;
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { CheckCircle2, Clock, Wrench, LogOut, RefreshCcw, MessageSquare, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Clock, Wrench, LogOut, RefreshCcw, MessageSquare, Send, ChevronDown, ChevronUp, Upload, Image, Trash2 } from 'lucide-react';
 import {
   useGetRequests,
   useUpdateRequest,
@@ -74,8 +74,106 @@ function CommentsPanel({ requestId }: { requestId: string }) {
   );
 }
 
+function CompletionUploader({ requestId, onConfirm }: { requestId: string; onConfirm: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  function handleFiles(picked: FileList | null) {
+    if (!picked) return;
+    setFiles(prev => [...prev, ...Array.from(picked)].slice(0, 3));
+  }
+
+  async function handleComplete() {
+    setIsUploading(true); setError('');
+    try {
+      if (files.length > 0) {
+        const fd = new FormData();
+        files.forEach(f => fd.append('files', f));
+        fd.append('attachmentType', 'completion');
+        const res = await fetch(`/api/requests/${requestId}/attachments`, {
+          method: 'POST', credentials: 'include', body: fd,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as { error?: string };
+          throw new Error(body.error ?? 'فشل الرفع');
+        }
+      }
+      onConfirm();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ');
+      setIsUploading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-xl p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <Upload className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-sm">تأكيد الإتمام</h3>
+            <p className="text-xs text-muted-foreground">يمكنك إرفاق صور الإنجاز (اختياري)</p>
+          </div>
+        </div>
+
+        {files.length < 3 && (
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="w-full border-2 border-dashed border-emerald-300 rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:bg-emerald-50 transition-colors"
+          >
+            <Image className="w-4 h-4 text-emerald-500" />
+            إرفاق صور الإتمام
+          </button>
+        )}
+        <input
+          ref={fileRef}
+          type="file" multiple accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={e => handleFiles(e.target.files)}
+        />
+
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {files.map((f, i) => (
+              <div key={i} className="flex items-center gap-1.5 bg-muted rounded-lg px-2 py-1 text-xs">
+                <Image className="w-3 h-3 text-muted-foreground" />
+                <span className="max-w-20 truncate">{f.name}</span>
+                <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleComplete}
+            disabled={isUploading}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {isUploading && <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+            <CheckCircle2 className="w-4 h-4" />
+            {files.length > 0 ? 'رفع وإتمام' : 'تأكيد الإتمام'}
+          </button>
+          <button onClick={onConfirm} disabled={isUploading} className="px-4 py-2.5 rounded-xl border border-border text-sm hover:bg-muted transition-colors">
+            تخطّي
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JobCard({ job, onComplete }: { job: MaintenanceRequest; onComplete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const isCompleted = job.status === 'مكتملة';
 
   return (
@@ -118,7 +216,7 @@ function JobCard({ job, onComplete }: { job: MaintenanceRequest; onComplete: (id
 
           {!isCompleted && (
             <button
-              onClick={() => onComplete(job.id)}
+              onClick={() => setShowCompleteModal(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors"
             >
               <CheckCircle2 className="w-4 h-4" />
@@ -128,6 +226,16 @@ function JobCard({ job, onComplete }: { job: MaintenanceRequest; onComplete: (id
 
           <CommentsPanel requestId={job.id} />
         </div>
+      )}
+
+      {showCompleteModal && (
+        <CompletionUploader
+          requestId={job.id}
+          onConfirm={() => {
+            setShowCompleteModal(false);
+            onComplete(job.id);
+          }}
+        />
       )}
     </div>
   );

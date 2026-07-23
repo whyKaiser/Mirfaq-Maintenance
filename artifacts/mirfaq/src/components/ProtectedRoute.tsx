@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useGetMe, getGetMeQueryKey } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
-import type { AuthUser } from '@workspace/api-client-react';
+import type { ExtAuthUser } from '@/context/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -22,19 +22,27 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     }
   });
 
+  // Sync fetched user into auth context
   useEffect(() => {
     if (data && !user) {
-      setUser(data as AuthUser);
+      setUser(data as ExtAuthUser);
     }
   }, [data, user, setUser]);
 
+  // Redirect to login when not authenticated
   useEffect(() => {
     if (isError) {
       setLocation('/login');
     }
   }, [isError, setLocation]);
 
-  const resolvedUser = user || data as AuthUser | undefined;
+  // Redirect to login when role is not allowed — MUST be in effect, never during render
+  const resolvedUser = (user || data) as ExtAuthUser | undefined;
+  useEffect(() => {
+    if (resolvedUser && allowedRoles && !allowedRoles.includes(resolvedUser.role)) {
+      setLocation('/login');
+    }
+  }, [resolvedUser, allowedRoles, setLocation]);
 
   if (isLoading && !resolvedUser) {
     return (
@@ -49,10 +57,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   if (!resolvedUser) return null;
 
-  if (allowedRoles && !allowedRoles.includes(resolvedUser.role)) {
-    setLocation('/login');
-    return null;
-  }
+  // Role mismatch — render nothing while effect redirects
+  if (allowedRoles && !allowedRoles.includes(resolvedUser.role)) return null;
 
   return <>{children}</>;
 }
