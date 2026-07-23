@@ -7,7 +7,9 @@ import {
   Building2, Home, Plus, Pencil, Trash2, X, AlertTriangle,
   Eye, EyeOff, Copy, Check, Shield, ClipboardList,
   Printer, UserCheck, UserX, Palette, Phone,
+  QrCode, Download,
 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import {
   useGetDashboardStats,
   useGetRequests,
@@ -77,6 +79,49 @@ interface ResidentUser {
   email: string;
   unitId: string | null;
   unitNumber: string | null;
+}
+
+function UnitQrModal({
+  unit,
+  propertyName,
+  onClose,
+}: {
+  unit: Unit;
+  propertyName: string;
+  onClose: () => void;
+}) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const reportUrl = `${window.location.origin}${import.meta.env.BASE_URL}login?unit=${encodeURIComponent(unit.id)}`;
+
+  function downloadQr() {
+    const canvas = canvasRef.current?.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `mirfaq-${propertyName}-${unit.number}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl border bg-card p-6 text-center shadow-2xl">
+        <div className="mb-5 flex items-center justify-between text-right">
+          <div>
+            <h2 className="font-bold">رمز بلاغ الوحدة</h2>
+            <p className="text-sm text-muted-foreground">{propertyName} — {unit.number}</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="إغلاق"><X className="h-5 w-5" /></button>
+        </div>
+        <div ref={canvasRef} className="mx-auto inline-flex rounded-2xl border bg-white p-5">
+          <QRCodeCanvas value={reportUrl} size={220} level="H" marginSize={1} />
+        </div>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">نزّل الرمز وضعه داخل الوحدة. يمسحه الساكن ثم يسجل الدخول ويرفع البلاغ.</p>
+        <button onClick={downloadQr} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground">
+          <Download className="h-4 w-4" /> تنزيل PNG
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ─── badge helpers ─────────────────────────────────────────────────────────────
@@ -980,6 +1025,7 @@ function UnitsView() {
   const [selectedPropId, setSelectedPropId] = useState<string>('');
   const [modal, setModal] = useState<null | { mode: 'create' } | { mode: 'edit'; unit: Unit }>(null);
   const [deleting, setDeleting] = useState<Unit | null>(null);
+  const [qrUnit, setQrUnit] = useState<Unit | null>(null);
 
   // Pick first property by default once loaded
   const activePropId = selectedPropId || properties[0]?.id || '';
@@ -1086,9 +1132,9 @@ function UnitsView() {
 
       {/* Units table */}
       {activePropId && (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl overflow-x-auto">
           {unitsLoading ? (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border min-w-[640px]">
               {[1, 2, 3].map(i => <div key={i} className="p-4 animate-pulse h-14" />)}
             </div>
           ) : units.length === 0 ? (
@@ -1121,6 +1167,13 @@ function UnitsView() {
                     )}
                   </div>
                   <div className="col-span-2 flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => setQrUnit(unit)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="رمز QR للبلاغ"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => setModal({ mode: 'edit', unit })}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -1159,6 +1212,14 @@ function UnitsView() {
           onConfirm={() => deleteUnit({ id: deleting.id })}
           onCancel={() => setDeleting(null)}
           isPending={delPending}
+        />
+      )}
+
+      {qrUnit && (
+        <UnitQrModal
+          unit={qrUnit}
+          propertyName={activeProp?.name ?? 'العقار'}
+          onClose={() => setQrUnit(null)}
         />
       )}
     </div>
@@ -1321,18 +1382,18 @@ function ManagerContent() {
     <div className="min-h-screen bg-muted/30 flex font-sans" dir="rtl">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-card border-l border-border flex flex-col fixed inset-y-0 right-0 z-10">
-        <div className="p-5 border-b border-border" style={{ backgroundColor: user?.brandColor ?? '#0891b2' }}>
+      <aside className="w-16 md:w-64 bg-card border-l border-border flex flex-col fixed inset-y-0 right-0 z-10">
+        <div className="p-3 md:p-5 border-b border-border" style={{ backgroundColor: user?.brandColor ?? '#0891b2' }}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 text-white font-bold text-xl flex items-center justify-center shadow-sm">م</div>
-            <div>
+            <div className="hidden md:block">
               <p className="font-bold text-sm text-white">{user?.organizationName ?? 'مِرفق'}</p>
               <p className="text-xs text-white/70">إدارة العقارات</p>
             </div>
           </div>
         </div>
 
-        <div className="p-4 border-b border-border">
+        <div className="hidden md:block p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold text-sm flex items-center justify-center">
               {user?.name?.[0]}
@@ -1344,36 +1405,38 @@ function ManagerContent() {
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-2 md:p-3 space-y-1 overflow-y-auto">
           {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveNav(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              title={label}
+              className={`w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 activeNav === id
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Icon className="w-4 h-4" />
-              {label}
+              <span className="hidden md:inline">{label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-border">
+        <div className="p-2 md:p-3 border-t border-border">
           <button
             onClick={() => doLogout()}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            title="تسجيل الخروج"
+            className="w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            تسجيل الخروج
+            <span className="hidden md:inline">تسجيل الخروج</span>
           </button>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 mr-64 p-6 min-h-screen">
+      <main className="flex-1 mr-16 md:mr-64 p-3 md:p-6 min-h-screen min-w-0">
 
         {/* ── Dashboard ── */}
         {activeNav === 'dashboard' && (

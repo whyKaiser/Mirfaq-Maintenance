@@ -16,10 +16,13 @@ if (isProduction && (!sessionSecret || sessionSecret.length < 32)) {
   throw new Error("SESSION_SECRET must contain at least 32 characters in production");
 }
 
-const allowedOrigins = (process.env["APP_ORIGINS"] || "")
+const configuredOrigins = (process.env["APP_ORIGINS"] || "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const allowedOrigins = isProduction
+  ? configuredOrigins
+  : [...configuredOrigins, "http://localhost:5173", "http://127.0.0.1:5173"];
 
 // Trust proxy (Replit reverse proxy)
 app.set("trust proxy", 1);

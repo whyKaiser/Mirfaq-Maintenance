@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && prisma generate && pnpm run build && pnpm run start",
+    "dev": "cross-env MIRFAQ_DB_URL=file:./dev.db prisma db push && cross-env NODE_ENV=development PORT=5000 MIRFAQ_DB_URL=file:./dev.db tsx watch src/index.ts",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "prisma generate",
+    "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts"
@@ -38,6 +39,7 @@
     "@types/express": "^4.17.21",
     "@types/express-session": "^1.18.1",
     "@types/node": "catalog:",
+    "cross-env": "^10.0.0",
     "esbuild": "0.27.3",
     "esbuild-plugin-pino": "^2.3.3",
     "pino-pretty": "^13.1.3",
