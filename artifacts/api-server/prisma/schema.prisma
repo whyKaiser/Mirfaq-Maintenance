@@ -21,7 +21,7 @@ datasource db {
 model Organization {
   id         String   @id @default(cuid())
   name       String
-  crNumber   String?  // رقم السجل التجاري
+  crNumber   String? // رقم السجل التجاري
   phone      String?
   city       String   @default("الرياض")
   brandColor String   @default("#0891b2")
@@ -34,6 +34,7 @@ model Organization {
   requests    MaintenanceRequest[]
   attachments RequestAttachment[]
   auditLogs   AuditLog[]
+  leads       SalesLead[]
 }
 
 model User {
@@ -42,7 +43,7 @@ model User {
   email          String   @unique
   phone          String?
   passwordHash   String
-  role           String   // "manager" | "resident" | "technician"
+  role           String // "manager" | "resident" | "technician"
   isActive       Boolean  @default(true)
   organizationId String
   createdAt      DateTime @default(now())
@@ -99,9 +100,9 @@ model MaintenanceRequest {
   id             String   @id @default(cuid())
   title          String
   description    String
-  category       String   // كهرباء | سباكة | تكييف | أخرى
-  priority       String   // عاجل | عادي
-  status         String   // معلّقة | قيد التنفيذ | مكتملة
+  category       String // كهرباء | سباكة | تكييف | أخرى
+  priority       String // عاجل | عادي
+  status         String // معلّقة | قيد التنفيذ | مكتملة
   propertyId     String
   unitId         String
   residentId     String
@@ -110,11 +111,11 @@ model MaintenanceRequest {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization       @relation(fields: [organizationId], references: [id])
-  property     Property           @relation(fields: [propertyId], references: [id])
-  unit         Unit               @relation(fields: [unitId], references: [id])
-  resident     User               @relation("RequestResident", fields: [residentId], references: [id])
-  technician   TechnicianProfile? @relation(fields: [technicianId], references: [id])
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  property     Property            @relation(fields: [propertyId], references: [id])
+  unit         Unit                @relation(fields: [unitId], references: [id])
+  resident     User                @relation("RequestResident", fields: [residentId], references: [id])
+  technician   TechnicianProfile?  @relation(fields: [technicianId], references: [id])
   comments     RequestComment[]
   attachments  RequestAttachment[]
 }
@@ -138,11 +139,11 @@ model RequestAttachment {
   requestId      String
   uploaderUserId String
   organizationId String
-  filePath       String   // filename only, e.g. "uuid.jpg"
-  fileName       String   // original name shown to user
+  filePath       String // filename only, e.g. "uuid.jpg"
+  fileName       String // original name shown to user
   mimeType       String
   sizeBytes      Int
-  attachmentType String   // "initial" | "completion"
+  attachmentType String // "initial" | "completion"
   createdAt      DateTime @default(now())
 
   request      MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -156,13 +157,30 @@ model AuditLog {
   organizationId String
   actorId        String
   actorName      String
-  action         String   // e.g. "create_request", "assign_technician"
-  entityType     String   // "request" | "property" | "unit" | "user"
+  action         String // e.g. "create_request", "assign_technician"
+  entityType     String // "request" | "property" | "unit" | "user"
   entityId       String?
   entityLabel    String?
-  details        String?  // JSON string for extra context
+  details        String? // JSON string for extra context
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id])
   actor        User         @relation("AuditActor", fields: [actorId], references: [id])
+}
+
+model SalesLead {
+  id             String   @id @default(cuid())
+  organizationId String?
+  name           String
+  companyName    String
+  phone          String
+  email          String?
+  unitsCount     Int?
+  message        String?
+  status         String   @default("جديد")
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
 }

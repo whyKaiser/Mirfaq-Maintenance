@@ -12,6 +12,7 @@ import usersRouter from "./users";
 import attachmentsRouter from "./attachments";
 import auditLogRouter from "./audit-log";
 import reportsRouter from "./reports";
+import leadsRouter from "./leads";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(usersRouter);
 router.use(attachmentsRouter);
 router.use(auditLogRouter);
 router.use(reportsRouter);
+router.use(leadsRouter);
 
 export default router;
