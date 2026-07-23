@@ -1,0 +1,74 @@
+Continue the existing "مِرفق" project with Phase 2 only.
+
+Budget and portability constraints:
+- Preserve the current design and Arabic RTL interface.
+- Do not redesign the landing page.
+- Do not use paid services or external APIs.
+- Do not use Replit Auth, Replit Database, or Replit-specific APIs.
+- Keep the project fully exportable to GitHub and runnable outside Replit.
+- Use the existing package manager and architecture.
+- Use Prisma with SQLite for this demo. Structure the data layer so PostgreSQL can replace SQLite later.
+- Do not implement payments, AI, maps, SMS, email, or cloud storage.
+- Do not begin features outside this phase.
+- Reuse existing components and avoid unnecessary dependencies.
+
+Build these working features:
+
+1. Database models:
+- User: id, name, email, passwordHash, role
+- Property: id, name, address, managerId
+- Unit: id, number, floor, propertyId, residentId
+- TechnicianProfile: id, userId, specialty, phone
+- MaintenanceRequest: id, title, description, category, priority, status, propertyId, unitId, residentId, technicianId, createdAt, updatedAt
+- RequestComment: id, content, requestId, authorId, createdAt
+
+2. Authentication:
+- Secure email/password login.
+- Hash passwords.
+- Session-based authentication using secure HTTP-only cookies.
+- Protect manager, resident, and technician routes.
+- Enforce role permissions on the server, not only in the interface.
+- Add logout.
+
+3. Demo accounts:
+- manager@mirfaq.sa / Demo123!
+- resident@mirfaq.sa / Demo123!
+- technician@mirfaq.sa / Demo123!
+Show these demo credentials clearly on the login page.
+
+4. Manager features:
+- View dashboard statistics.
+- Create, edit, and delete properties and units.
+- View all maintenance requests.
+- Assign a technician.
+- Change request priority and status.
+
+5. Resident features:
+- View assigned unit.
+- Create a maintenance request.
+- View own requests.
+- Add comments.
+
+6. Technician features:
+- View assigned requests.
+- Update request status.
+- Add work comments.
+
+7. Seed realistic Saudi Arabic demo data.
+
+8. Add validation, useful Arabic error messages, empty states, and loading states.
+
+9. Verify authorization:
+- Residents cannot access other residents' requests.
+- Technicians cannot access unassigned requests.
+- Only managers can manage properties, units, and assignments.
+
+10. Update README.md with:
+- Installation
+- Environment variables
+- Database setup
+- Seed command
+- Demo accounts
+- How to migrate from SQLite to PostgreSQL later
+
+Run database migrations, seed data, test all three roles, fix all build and runtime errors, then stop. Report the routes tested and any remaining issues. Do not begin Phase 3.

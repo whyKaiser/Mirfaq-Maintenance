@@ -2,14 +2,26 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: مِرفق API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: properties
+    description: Property management
+  - name: units
+    description: Unit management
+  - name: requests
+    description: Maintenance requests
+  - name: technicians
+    description: Technician profiles
+  - name: dashboard
+    description: Dashboard statistics
 paths:
   /healthz:
     get:
@@ -24,6 +36,383 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current authenticated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /properties:
+    get:
+      operationId: getProperties
+      tags: [properties]
+      summary: List manager properties
+      responses:
+        "200":
+          description: List of properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Property"
+    post:
+      operationId: createProperty
+      tags: [properties]
+      summary: Create a property
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+
+  /properties/{id}:
+    get:
+      operationId: getProperty
+      tags: [properties]
+      summary: Get a property
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Property
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProperty
+      tags: [properties]
+      summary: Update a property
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+    delete:
+      operationId: deleteProperty
+      tags: [properties]
+      summary: Delete a property
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /properties/{propertyId}/units:
+    get:
+      operationId: getUnits
+      tags: [units]
+      summary: List units in a property
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of units
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Unit"
+    post:
+      operationId: createUnit
+      tags: [units]
+      summary: Create a unit
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unit"
+
+  /units/{id}:
+    patch:
+      operationId: updateUnit
+      tags: [units]
+      summary: Update a unit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Unit"
+    delete:
+      operationId: deleteUnit
+      tags: [units]
+      summary: Delete a unit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /requests:
+    get:
+      operationId: getRequests
+      tags: [requests]
+      summary: List maintenance requests (role-filtered)
+      responses:
+        "200":
+          description: List of requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaintenanceRequest"
+    post:
+      operationId: createRequest
+      tags: [requests]
+      summary: Create a maintenance request (resident only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceRequest"
+
+  /requests/{id}:
+    get:
+      operationId: getRequest
+      tags: [requests]
+      summary: Get a maintenance request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceRequest"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateRequest
+      tags: [requests]
+      summary: Update a maintenance request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceRequest"
+
+  /requests/{requestId}/comments:
+    get:
+      operationId: getRequestComments
+      tags: [requests]
+      summary: Get comments for a request
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: createComment
+      tags: [requests]
+      summary: Add a comment to a request
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /technicians:
+    get:
+      operationId: getTechnicians
+      tags: [technicians]
+      summary: List technician profiles (manager only)
+      responses:
+        "200":
+          description: List of technicians
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechnicianProfile"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics (manager only)
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +423,238 @@ components:
       required:
         - status
 
+    AuthUser:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        unitId:
+          type: ["string", "null"]
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 1
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    Property:
+      type: object
+      required: [id, name, address, managerId, createdAt, unitCount]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        managerId:
+          type: string
+        createdAt:
+          type: string
+        unitCount:
+          type: integer
+
+    PropertyInput:
+      type: object
+      required: [name, address]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        address:
+          type: string
+          minLength: 1
+
+    PropertyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+
+    Unit:
+      type: object
+      required: [id, number, floor, propertyId]
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        floor:
+          type: integer
+        propertyId:
+          type: string
+        residentId:
+          type: ["string", "null"]
+        residentName:
+          type: ["string", "null"]
+
+    UnitInput:
+      type: object
+      required: [number, floor]
+      properties:
+        number:
+          type: string
+          minLength: 1
+        floor:
+          type: integer
+        residentId:
+          type: ["string", "null"]
+
+    UnitUpdate:
+      type: object
+      properties:
+        number:
+          type: string
+        floor:
+          type: integer
+        residentId:
+          type: ["string", "null"]
+
+    MaintenanceRequest:
+      type: object
+      required: [id, title, description, category, priority, status, propertyId, unitId, residentId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        priority:
+          type: string
+        status:
+          type: string
+        propertyId:
+          type: string
+        propertyName:
+          type: ["string", "null"]
+        unitId:
+          type: string
+        unitNumber:
+          type: ["string", "null"]
+        residentId:
+          type: string
+        residentName:
+          type: ["string", "null"]
+        technicianId:
+          type: ["string", "null"]
+        technicianName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    RequestInput:
+      type: object
+      required: [title, description, category, priority, unitId]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+        priority:
+          type: string
+        unitId:
+          type: string
+
+    RequestUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        priority:
+          type: string
+        technicianId:
+          type: ["string", "null"]
+        title:
+          type: string
+        description:
+          type: string
+
+    Comment:
+      type: object
+      required: [id, content, requestId, authorId, authorName, createdAt]
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+        requestId:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        createdAt:
+          type: string
+
+    CommentInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+
+    TechnicianProfile:
+      type: object
+      required: [id, userId, name, specialty, phone, activeJobsCount]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        specialty:
+          type: string
+        phone:
+          type: string
+        activeJobsCount:
+          type: integer
+
+    DashboardStats:
+      type: object
+      required: [totalRequests, pending, inProgress, completed, totalProperties, totalUnits, totalTechnicians]
+      properties:
+        totalRequests:
+          type: integer
+        pending:
+          type: integer
+        inProgress:
+          type: integer
+        completed:
+          type: integer
+        totalProperties:
+          type: integer
+        totalUnits:
+          type: integer
+        totalTechnicians:
+          type: integer

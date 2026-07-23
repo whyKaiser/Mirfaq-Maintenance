@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface UnitInput {
+  /** @minLength 1 */
+  number: string;
+  floor: number;
+  /** @nullable */
+  residentId?: string | null;
 }

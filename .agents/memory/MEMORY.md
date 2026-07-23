@@ -1,0 +1,2 @@
+- [Mirfaq Phase 2 Architecture](mirfaq-phase2.md) — SQLite via MIRFAQ_DB_URL; session auth; API at /api path; all Phase 2 complete.
+- [Prisma build approval](prisma-build-approval.md) — pnpm requires explicit build allowlist for Prisma; solution is root package.json pnpm.onlyBuiltDependencies.

@@ -1,162 +1,257 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
-import { LogOut, Wrench, CheckCircle2, Clock, MapPin, CheckCircle } from 'lucide-react';
-import { mockTechnicianJobs, mockTechnicianCompletedJobs, MaintenanceRequest } from '@/data/demo';
+import { useLocation } from 'wouter';
+import { CheckCircle2, Clock, Wrench, LogOut, RefreshCcw, MessageSquare, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  useGetRequests,
+  useUpdateRequest,
+  useGetRequestComments,
+  useCreateComment,
+  useLogout,
+  getGetRequestsQueryKey,
+  getGetRequestCommentsQueryKey,
+} from '@workspace/api-client-react';
+import type { MaintenanceRequest } from '@workspace/api-client-react';
+import { useAuth } from '@/context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
-export default function TechnicianDashboard() {
-  const [activeJobs, setActiveJobs] = useState<MaintenanceRequest[]>(mockTechnicianJobs);
-  const [completedJobs, setCompletedJobs] = useState<MaintenanceRequest[]>(mockTechnicianCompletedJobs);
-  const [isAvailable, setIsAvailable] = useState(true);
-
-  const completeJob = (jobId: string) => {
-    const job = activeJobs.find(j => j.id === jobId);
-    if (!job) return;
-
-    const completedJob = { ...job, status: 'مكتملة' as const };
-    setActiveJobs(activeJobs.filter(j => j.id !== jobId));
-    setCompletedJobs([completedJob, ...completedJobs]);
-  };
+function CommentsPanel({ requestId }: { requestId: string }) {
+  const [comment, setComment] = useState('');
+  const qc = useQueryClient();
+  const { data: comments = [], isLoading } = useGetRequestComments(requestId);
+  const { mutate: addComment, isPending } = useCreateComment({
+    mutation: {
+      onSuccess() {
+        qc.invalidateQueries({ queryKey: getGetRequestCommentsQueryKey(requestId) });
+        setComment('');
+      }
+    }
+  });
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col font-sans">
-      
-      {/* Navbar */}
-      <header className="bg-sidebar text-sidebar-foreground sticky top-0 z-20 shadow-md">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">م</div>
-            <span className="text-xl font-bold hidden sm:block">مِرفق</span>
-          </Link>
-          
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-left">
-              <p className="font-semibold text-sidebar-foreground">محمد الغامدي</p>
-              <p className="text-xs text-sidebar-foreground/70">فني سباكة</p>
+    <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+      <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+        <MessageSquare className="w-3.5 h-3.5" /> التعليقات
+      </h4>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1,2].map(i => <div key={i} className="h-7 bg-muted animate-pulse rounded-lg" />)}
+        </div>
+      ) : comments.length === 0 ? (
+        <p className="text-xs text-muted-foreground">لا توجد تعليقات بعد</p>
+      ) : (
+        <div className="space-y-2 max-h-36 overflow-y-auto">
+          {comments.map(c => (
+            <div key={c.id} className="bg-muted/40 rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-primary">{c.authorName}</p>
+              <p className="text-xs text-foreground mt-0.5 leading-relaxed">{c.content}</p>
             </div>
-            <div className="w-px h-8 bg-sidebar-border mx-1"></div>
-            <Link 
-              href="/login"
-              className="p-2 text-sidebar-foreground/70 hover:text-white transition-colors rounded-full hover:bg-sidebar-accent"
-              title="تسجيل الخروج"
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !isPending && comment.trim() && addComment({ requestId, data: { content: comment.trim() } })}
+          placeholder="اكتب ملاحظة أو تحديثاً..."
+          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        <button
+          onClick={() => {
+            const t = comment.trim();
+            if (t) addComment({ requestId, data: { content: t } });
+          }}
+          disabled={isPending || !comment.trim()}
+          className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function JobCard({ job, onComplete }: { job: MaintenanceRequest; onComplete: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const isCompleted = job.status === 'مكتملة';
+
+  return (
+    <div className={`bg-card border rounded-2xl overflow-hidden transition-all ${isCompleted ? 'border-emerald-200 opacity-75' : 'border-border'}`}>
+      <button
+        className="w-full text-right p-4 hover:bg-muted/20 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex items-start gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
+          }`}>
+            {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Wrench className="w-5 h-5" />}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
+                job.priority === 'عاجل'
+                  ? 'bg-red-100 text-red-700 border-red-200'
+                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>{job.priority}</span>
+              <span className="text-xs text-muted-foreground">{job.category}</span>
+            </div>
+            <p className="text-sm font-semibold">{job.title}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {job.residentName} · {job.unitNumber}
+            </p>
+          </div>
+
+          <div className="flex-shrink-0">
+            {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </div>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-border/50 pt-3 space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">{job.description}</p>
+
+          {!isCompleted && (
+            <button
+              onClick={() => onComplete(job.id)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 transition-colors"
             >
-              <LogOut className="w-5 h-5 rtl:rotate-180" />
-            </Link>
+              <CheckCircle2 className="w-4 h-4" />
+              تحديد كمكتملة
+            </button>
+          )}
+
+          <CommentsPanel requestId={job.id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TechnicianContent() {
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const qc = useQueryClient();
+
+  const { data: jobs = [], isLoading, refetch } = useGetRequests();
+
+  const { mutate: updateRequest } = useUpdateRequest({
+    mutation: {
+      onSuccess() {
+        qc.invalidateQueries({ queryKey: getGetRequestsQueryKey() });
+      }
+    }
+  });
+
+  const { mutate: doLogout } = useLogout({
+    mutation: {
+      onSuccess() {
+        logout();
+        setLocation('/login');
+      }
+    }
+  });
+
+  function completeJob(id: string) {
+    updateRequest({ id, data: { status: 'مكتملة' } });
+  }
+
+  const activeJobs     = jobs.filter(j => j.status !== 'مكتملة');
+  const completedJobs  = jobs.filter(j => j.status === 'مكتملة');
+
+  return (
+    <div className="min-h-screen bg-muted/30 font-sans" dir="rtl">
+
+      {/* Header */}
+      <header className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center">م</div>
+            <div>
+              <p className="text-sm font-bold leading-tight">{user?.name}</p>
+              <p className="text-xs text-muted-foreground">فني صيانة</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => refetch()} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+              <RefreshCcw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => doLogout()}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-3xl">
-        
-        {/* Status Toggle */}
-        <div className="bg-card border rounded-xl p-4 mb-8 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full animate-pulse ${isAvailable ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-            <div>
-              <p className="font-bold text-sm">حالة التوفر</p>
-              <p className="text-xs text-muted-foreground">
-                {isAvailable ? 'أنت متاح لاستقبال مهام جديدة' : 'أنت مشغول حالياً'}
-              </p>
-            </div>
+      <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Summary */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-card border border-border rounded-2xl p-4 text-center">
+            <p className="text-3xl font-bold text-blue-600">{activeJobs.length}</p>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> مهام نشطة
+            </p>
           </div>
-          <button 
-            onClick={() => setIsAvailable(!isAvailable)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isAvailable ? 'bg-green-500' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isAvailable ? '-translate-x-1' : '-translate-x-6'}`} />
-          </button>
+          <div className="bg-card border border-border rounded-2xl p-4 text-center">
+            <p className="text-3xl font-bold text-emerald-600">{completedJobs.length}</p>
+            <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> مكتملة
+            </p>
+          </div>
         </div>
 
         {/* Active Jobs */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              مهامي اليوم
-            </h2>
-            <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-sm font-bold">
-              {activeJobs.length}
-            </span>
-          </div>
+        <div className="space-y-3">
+          <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            المهام النشطة
+          </h2>
 
-          <div className="space-y-4">
-            {activeJobs.length > 0 ? (
-              activeJobs.map((job) => (
-                <div key={job.id} className="bg-card border-2 border-primary/20 rounded-xl p-5 shadow-sm hover:border-primary/50 transition-colors relative overflow-hidden group">
-                  {job.priority === 'عاجل' && (
-                    <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
-                      عاجل جداً
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-col gap-4">
-                    <div className="flex justify-between items-start mt-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                          <h3 className="font-bold text-lg">{job.unit}</h3>
-                        </div>
-                        <p className="text-muted-foreground font-medium pr-6">{job.description}</p>
-                      </div>
-                      <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                        {job.id}
-                      </span>
-                    </div>
-
-                    <div className="border-t pt-4 mt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="text-sm text-muted-foreground flex gap-4">
-                        <span>النوع: <strong className="text-foreground">{job.category}</strong></span>
-                        <span>بواسطة: <strong className="text-foreground">الإدارة</strong></span>
-                      </div>
-                      
-                      <button 
-                        onClick={() => completeJob(job.id)}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium shadow hover:bg-primary/90 transition-all active:scale-95"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                        إتمام المهمة
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-12 bg-card border rounded-xl shadow-sm">
-                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="w-8 h-8 text-green-500" />
-                </div>
-                <h3 className="text-xl font-bold mb-2">أحسنت!</h3>
-                <p className="text-muted-foreground">لا توجد مهام معلّقة. لقد أنجزت عملك لهذا اليوم.</p>
-              </div>
-            )}
-          </div>
+          {isLoading ? (
+            Array.from({length: 3}).map((_,i) => (
+              <div key={i} className="bg-card border border-border rounded-2xl p-4 animate-pulse h-20" />
+            ))
+          ) : activeJobs.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400" />
+              <p className="text-sm">لا توجد مهام نشطة حالياً</p>
+            </div>
+          ) : (
+            activeJobs.map(job => (
+              <JobCard key={job.id} job={job} onComplete={completeJob} />
+            ))
+          )}
         </div>
 
         {/* Completed Jobs */}
         {completedJobs.length > 0 && (
-          <div>
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-muted-foreground">
-              <CheckCircle2 className="w-5 h-5" />
-              المهام المكتملة حديثاً
+          <div className="space-y-3">
+            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              المكتملة ({completedJobs.length})
             </h2>
-            
-            <div className="space-y-3 opacity-70">
-              {completedJobs.map((job) => (
-                <div key={job.id} className="bg-card/50 border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-sm line-through decoration-muted-foreground/50">{job.unit} — {job.description}</h4>
-                    <p className="text-xs text-muted-foreground mt-1">رقم: {job.id}</p>
-                  </div>
-                  <span className="text-green-600 bg-green-50 px-2.5 py-1 rounded-md text-xs font-bold border border-green-100 flex items-center gap-1">
-                    مكتملة
-                  </span>
-                </div>
-              ))}
-            </div>
+            {completedJobs.map(job => (
+              <JobCard key={job.id} job={job} onComplete={completeJob} />
+            ))}
           </div>
         )}
 
-      </main>
+      </div>
     </div>
+  );
+}
+
+export default function TechnicianDashboard() {
+  return (
+    <ProtectedRoute allowedRoles={['technician']}>
+      <TechnicianContent />
+    </ProtectedRoute>
   );
 }

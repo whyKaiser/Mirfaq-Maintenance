@@ -1,0 +1,95 @@
+// Prisma schema for مِرفق — property maintenance management
+// Uses SQLite for development demo.
+// To migrate to PostgreSQL: change provider to "postgresql" and update MIRFAQ_DB_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("MIRFAQ_DB_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   // "manager" | "resident" | "technician"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  managedProperties  Property[]           @relation("PropertyManager")
+  residentUnit       Unit?                @relation("UnitResident")
+  technicianProfile  TechnicianProfile?
+  residentRequests   MaintenanceRequest[] @relation("RequestResident")
+  comments           RequestComment[]
+}
+
+model Property {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  managerId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  manager  User                 @relation("PropertyManager", fields: [managerId], references: [id])
+  units    Unit[]
+  requests MaintenanceRequest[]
+}
+
+model Unit {
+  id         String  @id @default(cuid())
+  number     String
+  floor      Int
+  propertyId String
+  residentId String? @unique
+
+  property Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  resident User?                @relation("UnitResident", fields: [residentId], references: [id])
+  requests MaintenanceRequest[]
+}
+
+model TechnicianProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  specialty String
+  phone     String
+
+  user     User                 @relation(fields: [userId], references: [id])
+  requests MaintenanceRequest[]
+}
+
+model MaintenanceRequest {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  category     String   // كهرباء | سباكة | تكييف | أخرى
+  priority     String   // عاجل | عادي
+  status       String   // معلّقة | قيد التنفيذ | مكتملة
+  propertyId   String
+  unitId       String
+  residentId   String
+  technicianId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  property   Property           @relation(fields: [propertyId], references: [id])
+  unit       Unit               @relation(fields: [unitId], references: [id])
+  resident   User               @relation("RequestResident", fields: [residentId], references: [id])
+  technician TechnicianProfile? @relation(fields: [technicianId], references: [id])
+  comments   RequestComment[]
+}
+
+model RequestComment {
+  id        String   @id @default(cuid())
+  content   String
+  requestId String
+  authorId  String
+  createdAt DateTime @default(now())
+
+  request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author  User               @relation(fields: [authorId], references: [id])
+}

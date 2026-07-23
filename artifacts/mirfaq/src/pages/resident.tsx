@@ -1,221 +1,321 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
-import { LogOut, Plus, Wrench, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { mockResidentRequests, MaintenanceRequest } from '@/data/demo';
+import { useLocation } from 'wouter';
+import { Plus, X, Clock, RefreshCcw, CheckCircle2, LogOut, Send, MessageSquare } from 'lucide-react';
+import {
+  useGetRequests,
+  useCreateRequest,
+  useGetRequestComments,
+  useCreateComment,
+  useLogout,
+  getGetRequestsQueryKey,
+  getGetRequestCommentsQueryKey,
+} from '@workspace/api-client-react';
+import type { MaintenanceRequest } from '@workspace/api-client-react';
+import { useAuth } from '@/context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
-export default function ResidentDashboard() {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>(mockResidentRequests);
-  const [showForm, setShowForm] = useState(false);
-  
-  // Form State
-  const [category, setCategory] = useState('كهرباء');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('عادي');
-  const [showToast, setShowToast] = useState(false);
+const STATUS_STYLES: Record<string, { label: string; style: string; icon: React.ReactNode }> = {
+  'معلّقة':      { label: 'معلّقة',      style: 'bg-amber-100 text-amber-800 border-amber-200', icon: <Clock className="w-3 h-3" /> },
+  'قيد التنفيذ': { label: 'قيد التنفيذ', style: 'bg-blue-100 text-blue-800 border-blue-200',   icon: <RefreshCcw className="w-3 h-3" /> },
+  'مكتملة':      { label: 'مكتملة',      style: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: <CheckCircle2 className="w-3 h-3" /> },
+};
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description.trim()) return;
+const CATEGORIES = ['كهرباء', 'سباكة', 'تكييف', 'أخرى'];
+const PRIORITIES = [{ value: 'عادي', label: 'عادي' }, { value: 'عاجل', label: 'عاجل 🔴' }];
 
-    const newReq: MaintenanceRequest = {
-      id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
-      unit: 'شقة 3B',
-      category: category as any,
-      description,
-      status: 'معلّقة',
-      priority: priority as any,
-      date: new Date().toISOString().split('T')[0]
-    };
-
-    setRequests([newReq, ...requests]);
-    setShowForm(false);
-    setDescription('');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch(status) {
-      case 'معلّقة': return <Clock className="w-5 h-5 text-amber-500" />;
-      case 'قيد التنفيذ': return <Wrench className="w-5 h-5 text-blue-500" />;
-      case 'مكتملة': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      default: return <AlertCircle className="w-5 h-5 text-gray-500" />;
+function CommentsPanel({ requestId }: { requestId: string }) {
+  const [comment, setComment] = useState('');
+  const qc = useQueryClient();
+  const { data: comments = [], isLoading } = useGetRequestComments(requestId);
+  const { mutate: addComment, isPending } = useCreateComment({
+    mutation: {
+      onSuccess() {
+        qc.invalidateQueries({ queryKey: getGetRequestCommentsQueryKey(requestId) });
+        setComment('');
+      }
     }
-  };
+  });
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'معلّقة': return 'bg-amber-50 border-amber-200';
-      case 'قيد التنفيذ': return 'bg-blue-50 border-blue-200';
-      case 'مكتملة': return 'bg-green-50 border-green-200';
-      default: return 'bg-gray-50 border-gray-200';
-    }
-  };
+  function handleSend() {
+    const trimmed = comment.trim();
+    if (!trimmed) return;
+    addComment({ requestId, data: { content: trimmed } });
+  }
 
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col font-sans">
-      
-      {/* Navbar */}
-      <header className="bg-card border-b sticky top-0 z-20">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">م</div>
-            <span className="text-xl font-bold hidden sm:block">مِرفق</span>
-          </Link>
-          
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-left">
-              <p className="font-semibold">سارة الزهراني</p>
-              <p className="text-xs text-muted-foreground">شقة 3B</p>
+    <div className="mt-4 border-t border-border pt-4 space-y-3">
+      <h4 className="text-sm font-semibold flex items-center gap-1.5">
+        <MessageSquare className="w-4 h-4" />
+        التعليقات
+      </h4>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1,2].map(i => <div key={i} className="h-8 bg-muted animate-pulse rounded-lg" />)}
+        </div>
+      ) : comments.length === 0 ? (
+        <p className="text-xs text-muted-foreground">لا توجد تعليقات بعد</p>
+      ) : (
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          {comments.map(c => (
+            <div key={c.id} className="bg-muted/50 rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-primary">{c.authorName}</p>
+              <p className="text-xs text-foreground mt-0.5 leading-relaxed">{c.content}</p>
             </div>
-            <div className="w-px h-8 bg-border mx-1"></div>
-            <Link 
-              href="/login"
-              className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-muted"
-              title="تسجيل الخروج"
-            >
-              <LogOut className="w-5 h-5 rtl:rotate-180" />
-            </Link>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="اكتب تعليقاً..."
+          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        <button
+          onClick={handleSend}
+          disabled={isPending || !comment.trim()}
+          className="px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RequestCard({ req }: { req: MaintenanceRequest }) {
+  const [expanded, setExpanded] = useState(false);
+  const info = STATUS_STYLES[req.status] ?? { label: req.status, style: 'bg-muted text-muted-foreground border-border', icon: null };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <button
+        className="w-full text-right p-4 hover:bg-muted/20 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${info.style}`}>
+                {info.icon}{info.label}
+              </span>
+              {req.priority === 'عاجل' && (
+                <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 border border-red-200 font-medium">عاجل</span>
+              )}
+              <span className="text-xs text-muted-foreground">{req.category}</span>
+            </div>
+            <p className="text-sm font-semibold">{req.title}</p>
+            {req.technicianName && (
+              <p className="text-xs text-muted-foreground mt-0.5">الفني: {req.technicianName}</p>
+            )}
           </div>
+          <span className="text-muted-foreground text-xs pt-1 flex-shrink-0">
+            {new Date(req.createdAt).toLocaleDateString('ar-SA')}
+          </span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-border/50 pt-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">{req.description}</p>
+          <CommentsPanel requestId={req.id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResidentContent() {
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('كهرباء');
+  const [priority, setPriority] = useState('عادي');
+  const qc = useQueryClient();
+
+  const { data: requests = [], isLoading } = useGetRequests();
+
+  const { mutate: createRequest, isPending: isCreating } = useCreateRequest({
+    mutation: {
+      onSuccess() {
+        qc.invalidateQueries({ queryKey: getGetRequestsQueryKey() });
+        setShowForm(false);
+        setTitle('');
+        setDescription('');
+        setCategory('كهرباء');
+        setPriority('عادي');
+      }
+    }
+  });
+
+  const { mutate: doLogout } = useLogout({
+    mutation: {
+      onSuccess() {
+        logout();
+        setLocation('/login');
+      }
+    }
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !description.trim() || !user?.unitId) return;
+    createRequest({
+      data: { title: title.trim(), description: description.trim(), category, priority, unitId: user.unitId }
+    });
+  }
+
+  const activeRequests = requests.filter(r => r.status !== 'مكتملة');
+  const completedRequests = requests.filter(r => r.status === 'مكتملة');
+
+  return (
+    <div className="min-h-screen bg-muted/30 font-sans" dir="rtl">
+
+      {/* Header */}
+      <header className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center">م</div>
+            <div>
+              <p className="text-sm font-bold leading-tight">{user?.name}</p>
+              <p className="text-xs text-muted-foreground">وحدة {requests[0]?.unitNumber ?? '—'}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => doLogout()}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            خروج
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl relative">
-        
-        {/* Toast Notification */}
-        {showToast && (
-          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-top-4 fade-in duration-300">
-            <CheckCircle2 className="w-5 h-5" />
-            <span className="font-medium">تم إرسال بلاغك بنجاح</span>
-          </div>
-        )}
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">بلاغاتي</h1>
-            <p className="text-muted-foreground">تابع حالة طلبات الصيانة الخاصة بوحدتك</p>
-          </div>
-          
-          <button 
-            onClick={() => setShowForm(!showForm)}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-md font-medium shadow hover:bg-primary/90 transition-colors"
-          >
-            <Plus className={`w-5 h-5 transition-transform ${showForm ? 'rotate-45' : ''}`} />
-            <span className="hidden sm:inline">إرسال بلاغ جديد</span>
-          </button>
-        </div>
+        {/* New Request Button */}
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-colors font-medium"
+        >
+          {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          {showForm ? 'إلغاء' : 'بلاغ صيانة جديد'}
+        </button>
 
-        {/* New Request Form (Collapsible) */}
+        {/* New Request Form */}
         {showForm && (
-          <div className="mb-8 bg-card border rounded-xl shadow-sm p-6 animate-in slide-in-from-top-4 fade-in duration-300">
-            <h2 className="text-lg font-bold mb-4">تفاصيل المشكلة</h2>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">نوع المشكلة</label>
-                  <select 
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="كهرباء">كهرباء</option>
-                    <option value="سباكة">سباكة</option>
-                    <option value="تكييف">تكييف</option>
-                    <option value="أخرى">أخرى</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">الأولوية</label>
-                  <select 
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                    className="w-full border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="عادي">عادي</option>
-                    <option value="عاجل">عاجل</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium">وصف المشكلة</label>
-                <textarea 
-                  required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="صف المشكلة باختصار لمساعدة الفني..."
-                  className="w-full border rounded-md px-3 py-2 bg-background min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
+          <form onSubmit={handleSubmit} className="bg-card border border-border rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2 duration-200">
+            <h2 className="font-bold text-base">تفاصيل البلاغ</h2>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">عنوان المشكلة</label>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="مثال: تسرب مياه في الحمام"
+                required
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">وصف المشكلة</label>
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="اشرح المشكلة بالتفصيل..."
+                required
+                rows={3}
+                className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">التصنيف</label>
+                <select
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 border rounded-md font-medium text-muted-foreground hover:bg-muted transition-colors"
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">الأولوية</label>
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
-                  إلغاء
-                </button>
-                <button 
-                  type="submit"
-                  className="px-6 py-2 bg-primary text-primary-foreground rounded-md font-medium shadow hover:bg-primary/90 transition-colors"
-                >
-                  إرسال البلاغ
-                </button>
+                  {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
               </div>
-            </form>
-          </div>
+            </div>
+
+            {!user?.unitId && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                لم يتم تعيين وحدة لهذا الحساب. تواصل مع مدير العقار.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={isCreating || !user?.unitId}
+              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {isCreating && <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />}
+              إرسال البلاغ
+            </button>
+          </form>
         )}
 
-        {/* Requests List */}
-        <div className="space-y-4">
-          {requests.length > 0 ? (
-            requests.map((req) => (
-              <div key={req.id} className={`bg-card rounded-xl border p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden`}>
-                <div className={`absolute top-0 right-0 bottom-0 w-1 ${
-                  req.status === 'معلّقة' ? 'bg-amber-500' :
-                  req.status === 'قيد التنفيذ' ? 'bg-blue-500' : 'bg-green-500'
-                }`} />
-                
-                <div className="flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                        {req.id}
-                      </span>
-                      <span className="font-medium">{req.category}</span>
-                      {req.priority === 'عاجل' && (
-                        <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">
-                          عاجل
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-foreground text-sm font-medium mt-1">{req.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {req.date} • {req.technicianName ? `الفني: ${req.technicianName}` : 'بانتظار التكليف'}
-                    </p>
-                  </div>
-                  
-                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium shrink-0 ${getStatusColor(req.status)}`}>
-                    {getStatusIcon(req.status)}
-                    <span>{req.status}</span>
-                  </div>
-                </div>
-              </div>
+        {/* Active Requests */}
+        <div className="space-y-3">
+          <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            البلاغات النشطة ({activeRequests.length})
+          </h2>
+
+          {isLoading ? (
+            Array.from({length:3}).map((_,i) => (
+              <div key={i} className="bg-card border border-border rounded-2xl p-4 animate-pulse h-20" />
             ))
-          ) : (
-            <div className="text-center py-16 bg-card border rounded-xl border-dashed">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">لا توجد بلاغات</h3>
-              <p className="text-muted-foreground text-sm">كل شيء يعمل بشكل جيد في وحدتك.</p>
+          ) : activeRequests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400" />
+              <p className="text-sm">لا توجد بلاغات نشطة — كل شيء بخير!</p>
             </div>
+          ) : (
+            activeRequests.map(req => <RequestCard key={req.id} req={req} />)
           )}
         </div>
 
-      </main>
+        {/* Completed Requests */}
+        {completedRequests.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              المكتملة ({completedRequests.length})
+            </h2>
+            {completedRequests.map(req => <RequestCard key={req.id} req={req} />)}
+          </div>
+        )}
+
+      </div>
     </div>
+  );
+}
+
+export default function ResidentDashboard() {
+  return (
+    <ProtectedRoute allowedRoles={['resident']}>
+      <ResidentContent />
+    </ProtectedRoute>
   );
 }
