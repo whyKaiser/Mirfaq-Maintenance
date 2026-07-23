@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "مِرفق"
+version = "1.0.0"
+id = "artifacts/mirfaq"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23085
+
+[services.development]
+run = "pnpm --filter @workspace/mirfaq run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mirfaq", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mirfaq/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23085"
+BASE_PATH = "/"
