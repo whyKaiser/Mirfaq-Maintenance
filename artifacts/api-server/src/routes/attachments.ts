@@ -1,18 +1,47 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import path from "path";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { upload } from "../lib/upload";
 import { getFileUrl, deleteStoredFile, UPLOAD_DIR } from "../lib/storage";
 import { logAction } from "../lib/audit";
+import { getMaintenanceRequestAccess } from "../lib/request-access";
 
 const router = Router();
+
+const requireRequestAccess: RequestHandler = async (req, res, next) => {
+  try {
+    const access = await getMaintenanceRequestAccess(
+      {
+        organizationId: req.session.organizationId!,
+        userId: req.session.userId!,
+        role: req.session.userRole!,
+      },
+      req.params.requestId,
+    );
+    if (access.decision === "not-found") {
+      return res.status(404).json({ error: "البلاغ غير موجود" });
+    }
+    if (access.decision === "forbidden") {
+      return res
+        .status(403)
+        .json({ error: "ليس لديك صلاحية الوصول لهذا البلاغ" });
+    }
+
+    res.locals.maintenanceRequest = access.request;
+    next();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "خطأ في الخادم" });
+  }
+};
 
 // POST /api/requests/:requestId/attachments
 // Accepts up to 3 images (JPEG/PNG/WebP, max 3 MB each)
 router.post(
   "/requests/:requestId/attachments",
   requireAuth,
+  requireRequestAccess,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req, res, next) => (upload as any).array("images", 3)(req, res, (err: unknown) => {
     if (err) {
@@ -30,26 +59,11 @@ router.post(
         return res.status(400).json({ error: "لم يتم إرفاق أي صورة" });
       }
 
-      // Load request and verify org isolation
-      const request = await prisma.maintenanceRequest.findFirst({
-        where: { id: requestId, organizationId: req.session.organizationId! },
-      });
-      if (!request) {
-        return res.status(404).json({ error: "البلاغ غير موجود" });
-      }
-
-      // Role checks
-      const role = req.session.userRole!;
       const userId = req.session.userId!;
-      if (role === "resident" && request.residentId !== userId) {
-        return res.status(403).json({ error: "ليس لديك صلاحية رفع مرفق لهذا البلاغ" });
-      }
-      if (role === "technician") {
-        const profile = await prisma.technicianProfile.findUnique({ where: { userId } });
-        if (!profile || request.technicianId !== profile.id) {
-          return res.status(403).json({ error: "ليس لديك صلاحية رفع مرفق لهذا البلاغ" });
-        }
-      }
+      const request = res.locals.maintenanceRequest as {
+        id: string;
+        title: string;
+      };
 
       // Check total count won't exceed 3 per type
       const existing = await prisma.requestAttachment.count({ where: { requestId, attachmentType } });
@@ -111,6 +125,21 @@ router.delete("/attachments/:id", requireAuth, async (req, res) => {
     });
     if (!attachment) return res.status(404).json({ error: "المرفق غير موجود" });
 
+    const access = await getMaintenanceRequestAccess(
+      {
+        organizationId: req.session.organizationId!,
+        userId: req.session.userId!,
+        role: req.session.userRole!,
+      },
+      attachment.requestId,
+    );
+    if (access.decision === "not-found") {
+      return res.status(404).json({ error: "المرفق غير موجود" });
+    }
+    if (access.decision === "forbidden") {
+      return res.status(403).json({ error: "ليس لديك صلاحية حذف هذا المرفق" });
+    }
+
     const role = req.session.userRole!;
     if (role !== "manager" && attachment.uploaderUserId !== req.session.userId) {
       return res.status(403).json({ error: "ليس لديك صلاحية حذف هذا المرفق" });
@@ -125,7 +154,7 @@ router.delete("/attachments/:id", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/files/:filename  (authenticated file serving with org check)
+// GET /api/files/:filename  (authenticated file serving with request access check)
 router.get("/files/:filename", requireAuth, async (req, res) => {
   try {
     const { filename } = req.params;
@@ -139,6 +168,21 @@ router.get("/files/:filename", requireAuth, async (req, res) => {
       where: { filePath: filename, organizationId: req.session.organizationId! },
     });
     if (!attachment) return res.status(404).json({ error: "الملف غير موجود" });
+
+    const access = await getMaintenanceRequestAccess(
+      {
+        organizationId: req.session.organizationId!,
+        userId: req.session.userId!,
+        role: req.session.userRole!,
+      },
+      attachment.requestId,
+    );
+    if (access.decision === "not-found") {
+      return res.status(404).json({ error: "الملف غير موجود" });
+    }
+    if (access.decision === "forbidden") {
+      return res.status(403).json({ error: "ليس لديك صلاحية الوصول لهذا الملف" });
+    }
 
     const filePath = path.join(UPLOAD_DIR, filename);
     res.setHeader("Content-Type", attachment.mimeType);

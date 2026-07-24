@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { logAction } from "../lib/audit";
+import { getPasswordPolicyError } from "../lib/password-policy";
 
 const router = Router();
 
@@ -57,6 +58,10 @@ router.post("/users", requireRole("manager"), async (req, res) => {
     }
     if (!["resident", "technician"].includes(role)) {
       return res.status(400).json({ error: "الدور يجب أن يكون ساكن أو فني" });
+    }
+    const passwordError = getPasswordPolicyError(password);
+    if (passwordError) {
+      return res.status(400).json({ error: passwordError });
     }
     if (role === "technician" && !specialty?.trim()) {
       return res.status(400).json({ error: "التخصص مطلوب للفني" });
@@ -165,7 +170,13 @@ router.patch("/users/:id", requireRole("manager"), async (req, res) => {
     if (phone !== undefined) updateData.phone = phone?.trim() || null;
     if (email?.trim()) updateData.email = email.trim().toLowerCase();
     if (typeof isActive === "boolean") updateData.isActive = isActive;
-    if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
+    if (password !== undefined) {
+      const passwordError = getPasswordPolicyError(password);
+      if (passwordError) {
+        return res.status(400).json({ error: passwordError });
+      }
+      updateData.passwordHash = await bcrypt.hash(password, 12);
+    }
 
     const user = await prisma.user.update({ where: { id: req.params.id }, data: updateData });
 
