@@ -1,9 +1,13 @@
 import { Router, type RequestHandler } from "express";
-import path from "path";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
-import { upload } from "../lib/upload";
-import { getFileUrl, deleteStoredFile, UPLOAD_DIR } from "../lib/storage";
+import { upload, buildStorageKey } from "../lib/upload";
+import {
+  getFileUrl,
+  deleteStoredFile,
+  saveStoredFile,
+  readStoredFile,
+} from "../lib/storage";
 import { logAction } from "../lib/audit";
 import { getMaintenanceRequestAccess } from "../lib/request-access";
 
@@ -71,14 +75,24 @@ router.post(
         return res.status(400).json({ error: `الحد الأقصى 3 صور من نوع ${attachmentType === "initial" ? "أولي" : "إتمام"} لكل بلاغ` });
       }
 
+      // Store the bytes first: a stored object with no row is recoverable
+      // clutter, while a row pointing at nothing breaks the attachment list.
+      const stored = await Promise.all(
+        files.map(async (file) => {
+          const key = buildStorageKey(file.mimetype);
+          await saveStoredFile(key, file.buffer, file.mimetype);
+          return { file, key };
+        }),
+      );
+
       const created = await Promise.all(
-        files.map((file) =>
+        stored.map(({ file, key }) =>
           prisma.requestAttachment.create({
             data: {
               requestId,
               uploaderUserId: userId,
               organizationId: req.session.organizationId!,
-              filePath: file.filename,
+              filePath: key,
               fileName: file.originalname,
               mimeType: file.mimetype,
               sizeBytes: file.size,
@@ -184,10 +198,17 @@ router.get("/files/:filename", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "ليس لديك صلاحية الوصول لهذا الملف" });
     }
 
-    const filePath = path.join(UPLOAD_DIR, filename);
+    const stream = await readStoredFile(filename);
+    if (!stream) return res.status(404).json({ error: "الملف غير موجود" });
+
     res.setHeader("Content-Type", attachment.mimeType);
     res.setHeader("Cache-Control", "private, max-age=86400");
-    res.sendFile(filePath);
+    stream.on("error", (err) => {
+      req.log.error(err);
+      if (!res.headersSent) res.status(500).json({ error: "خطأ في الخادم" });
+      else res.end();
+    });
+    stream.pipe(res);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "خطأ في الخادم" });
