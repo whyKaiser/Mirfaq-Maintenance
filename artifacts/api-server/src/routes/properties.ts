@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { logAction } from "../lib/audit";
+import { checkLimit } from "../lib/plan-usage";
 
 const router = Router();
 
@@ -42,6 +43,12 @@ router.post("/properties", requireRole("manager"), async (req, res) => {
     if (!name?.trim() || !address?.trim()) {
       return res.status(400).json({ error: "اسم العقار والعنوان مطلوبان" });
     }
+
+    const limit = await checkLimit(req.session.organizationId!, "properties");
+    if (!limit.allowed) {
+      return res.status(402).json({ error: limit.message, limit: limit.limit, current: limit.current });
+    }
+
     const prop = await prisma.property.create({
       data: {
         name: name.trim(),

@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startPlanReminders } from "./lib/plan-reminders";
 
 const rawPort = process.env["PORT"];
 
@@ -17,4 +18,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 app.listen(port, () => {
   logger.info({ port }, "Server listening");
+  if (process.env["DISABLE_PLAN_REMINDERS"] !== "1") {
+    startPlanReminders();
+  }
 });

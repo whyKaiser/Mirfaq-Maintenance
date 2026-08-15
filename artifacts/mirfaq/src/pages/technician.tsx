@@ -14,6 +14,7 @@ import type { MaintenanceRequest } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { NotificationBell } from '@/components/NotificationBell';
 
 function CommentsPanel({ requestId }: { requestId: string }) {
   const [comment, setComment] = useState('');
@@ -286,6 +287,7 @@ function TechnicianContent() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className="w-auto"><NotificationBell /></div>
             <button onClick={() => refetch()} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <RefreshCcw className="w-4 h-4" />
             </button>

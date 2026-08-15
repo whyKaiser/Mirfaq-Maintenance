@@ -69,10 +69,11 @@ interface OrgSettings {
 }
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'preventive' | 'technicians' | 'users' | 'audit' | 'settings';
+type NavSection = 'dashboard' | 'properties' | 'units' | 'requests' | 'preventive' | 'technicians' | 'users' | 'audit' | 'billing' | 'settings';
 
 interface ResidentUser {
   id: string;
@@ -615,6 +616,297 @@ function RequestDetailModal({
 }
 
 // ─── settings view ─────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// الاشتراك والفوترة
+// ─────────────────────────────────────────────────────────────────────────────
+
+type PlanOption = {
+  code: string;
+  name: string;
+  monthlyPrice: number | null;
+  isCustomPriced: boolean;
+  maxUnits: number | null;
+  maxProperties: number | null;
+  maxManagers: number | null;
+  maxTechnicians: number | null;
+  features: string[];
+};
+
+type SubscriptionState = {
+  planCode: string;
+  planName: string;
+  monthlyPrice: number | null;
+  isCustomPriced: boolean;
+  status: string;
+  renewsAt: string | null;
+  usage: { units: number; properties: number; managers: number; technicians: number };
+  limits: { units: number | null; properties: number | null; managers: number | null; technicians: number | null };
+};
+
+type InvoiceRow = {
+  id: string;
+  periodLabel: string;
+  planName: string;
+  subscription: number;
+  maintenance: number;
+  vat: number;
+  total: number;
+  requestsCount: number;
+  status: string;
+};
+
+const RESOURCE_ROWS: { key: 'units' | 'properties' | 'managers' | 'technicians'; label: string }[] = [
+  { key: 'properties', label: 'العقارات' },
+  { key: 'units', label: 'الوحدات' },
+  { key: 'managers', label: 'المدراء' },
+  { key: 'technicians', label: 'الفنيون' },
+];
+
+function money(value: number) {
+  return value.toLocaleString('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function UsageBar({ current, limit }: { current: number; limit: number | null }) {
+  if (limit === null) {
+    return <p className="text-xs text-muted-foreground">{current} · بلا حد</p>;
+  }
+  const pct = Math.min(100, Math.round((current / Math.max(limit, 1)) * 100));
+  const nearLimit = pct >= 80;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{current} من {limit}</p>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full ${nearLimit ? 'bg-destructive' : 'bg-primary'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BillingView() {
+  const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function load() {
+    setError('');
+    try {
+      const [subRes, planRes, invRes] = await Promise.all([
+        fetch('/api/subscription', { credentials: 'include' }),
+        fetch('/api/plans', { credentials: 'include' }),
+        fetch('/api/invoices', { credentials: 'include' }),
+      ]);
+      if (!subRes.ok || !planRes.ok || !invRes.ok) throw new Error();
+      setSubscription(await subRes.json());
+      setPlans(await planRes.json());
+      setInvoices(await invRes.json());
+    } catch {
+      setError('تعذّر تحميل بيانات الاشتراك');
+    }
+    setIsLoading(false);
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  async function changePlan(planCode: string) {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/subscription', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ planCode }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? 'تعذّر تغيير الباقة');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذّر تغيير الباقة');
+    }
+    setBusy(false);
+  }
+
+  async function generateInvoice() {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error();
+      await load();
+    } catch {
+      setError('تعذّر إصدار فاتورة الشهر الحالي');
+    }
+    setBusy(false);
+  }
+
+  async function setInvoiceStatus(id: string, status: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/invoices/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error();
+      await load();
+    } catch {
+      setError('تعذّر تحديث حالة الفاتورة');
+    }
+    setBusy(false);
+  }
+
+  if (isLoading) return (
+    <div className="space-y-4 animate-in fade-in">
+      {[1, 2, 3].map(i => <div key={i} className="h-24 bg-muted animate-pulse rounded-2xl" />)}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div>
+        <h1 className="text-2xl font-bold">الاشتراك والفوترة</h1>
+        <p className="text-muted-foreground text-sm mt-1">الباقة الحالية وحدود الاستخدام والفواتير الشهرية</p>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {subscription && (
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">الباقة الحالية</p>
+              <p className="text-xl font-bold">{subscription.planName}</p>
+            </div>
+            <div className="text-left">
+              <p className="text-sm text-muted-foreground">الاشتراك الشهري</p>
+              <p className="text-xl font-bold">
+                {subscription.isCustomPriced ? 'حسب الاحتياج' : `${money(subscription.monthlyPrice ?? 0)} ر.س`}
+              </p>
+            </div>
+            <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-bold">
+              {subscription.status}
+            </span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {RESOURCE_ROWS.map(({ key, label }) => (
+              <div key={key} className="rounded-xl border border-border p-3">
+                <p className="text-sm font-medium mb-2">{label}</p>
+                <UsageBar current={subscription.usage[key]} limit={subscription.limits[key]} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-lg font-bold mb-3">الباقات المتاحة</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {plans.map(plan => {
+            const isCurrent = plan.code === subscription?.planCode;
+            return (
+              <article
+                key={plan.code}
+                className={`rounded-2xl border p-4 flex flex-col ${isCurrent ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
+              >
+                <p className="font-bold">{plan.name}</p>
+                <p className="mt-1 text-2xl font-black">
+                  {plan.isCustomPriced ? 'حسب الاحتياج' : `${money(plan.monthlyPrice ?? 0)}`}
+                  {!plan.isCustomPriced && <span className="text-sm font-normal text-muted-foreground"> ر.س/شهر</span>}
+                </p>
+                <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground flex-1">
+                  {plan.features.map(feature => (
+                    <li key={feature} className="flex gap-2"><Check className="w-4 h-4 text-primary shrink-0" />{feature}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  disabled={isCurrent || busy}
+                  onClick={() => changePlan(plan.code)}
+                  className="mt-4 w-full rounded-xl px-3 py-2 text-sm font-bold bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCurrent ? 'باقتك الحالية' : 'تحويل لهذه الباقة'}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold">الفواتير</h2>
+          <button
+            type="button"
+            onClick={generateInvoice}
+            disabled={busy}
+            className="rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm font-bold disabled:opacity-50"
+          >
+            إصدار فاتورة الشهر الحالي
+          </button>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm min-w-[42rem]">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="text-right px-3 py-2 font-medium">الشهر</th>
+                <th className="text-right px-3 py-2 font-medium">الباقة</th>
+                <th className="text-right px-3 py-2 font-medium">الاشتراك</th>
+                <th className="text-right px-3 py-2 font-medium">الصيانة</th>
+                <th className="text-right px-3 py-2 font-medium">الضريبة</th>
+                <th className="text-right px-3 py-2 font-medium">الإجمالي</th>
+                <th className="text-right px-3 py-2 font-medium">الحالة</th>
+                <th className="text-right px-3 py-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.length === 0 && (
+                <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">لا توجد فواتير بعد</td></tr>
+              )}
+              {invoices.map(inv => (
+                <tr key={inv.id} className="border-t border-border">
+                  <td className="px-3 py-2.5 font-medium">{inv.periodLabel}</td>
+                  <td className="px-3 py-2.5">{inv.planName}</td>
+                  <td className="px-3 py-2.5">{money(inv.subscription)}</td>
+                  <td className="px-3 py-2.5">{money(inv.maintenance)}</td>
+                  <td className="px-3 py-2.5">{money(inv.vat)}</td>
+                  <td className="px-3 py-2.5 font-bold">{money(inv.total)} ر.س</td>
+                  <td className="px-3 py-2.5">{inv.status}</td>
+                  <td className="px-3 py-2.5">
+                    {inv.status === 'مسودة' && (
+                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'صادرة')} className="text-primary hover:underline disabled:opacity-50">إصدار</button>
+                    )}
+                    {inv.status === 'صادرة' && (
+                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'مدفوعة')} className="text-primary hover:underline disabled:opacity-50">تعليم كمدفوعة</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SettingsView() {
   const [settings, setSettings] = useState<OrgSettings | null>(null);
@@ -2020,6 +2312,7 @@ function ManagerContent() {
     { id: 'technicians', label: 'الفنيون',         icon: Users },
     { id: 'users',       label: 'المستخدمون',      icon: Shield },
     { id: 'audit',       label: 'سجل العمليات',    icon: ClipboardList },
+    { id: 'billing',     label: 'الاشتراك والفوترة', icon: CircleDollarSign },
     { id: 'settings',    label: 'إعدادات الشركة',  icon: Settings },
   ];
 
@@ -2068,7 +2361,8 @@ function ManagerContent() {
           ))}
         </nav>
 
-        <div className="p-2 md:p-3 border-t border-border">
+        <div className="p-2 md:p-3 border-t border-border space-y-1">
+          <NotificationBell />
           <button
             onClick={() => doLogout()}
             title="تسجيل الخروج"
@@ -2301,6 +2595,7 @@ function ManagerContent() {
         {activeNav === 'audit' && <AuditView />}
 
         {/* ── Settings ── */}
+        {activeNav === 'billing' && <BillingView />}
         {activeNav === 'settings' && <SettingsView />}
 
         {/* ── Technicians ── */}

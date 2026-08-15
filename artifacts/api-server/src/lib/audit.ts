@@ -26,7 +26,9 @@ export type AuditAction =
   | "delete_preventive_plan"
   | "complete_preventive_plan"
   | "update_preventive_plan"
-  | "rotate_unit_public_token";
+  | "rotate_unit_public_token"
+  | "change_plan"
+  | "update_invoice_status";
 
 export interface LogActionParams {
   organizationId: string;
@@ -79,4 +81,6 @@ export const ACTION_LABELS: Record<AuditAction, string> = {
   complete_preventive_plan: "إكمال صيانة وقائية",
   update_preventive_plan: "تحديث خطة صيانة وقائية",
   rotate_unit_public_token: "تدوير رمز بلاغ الوحدة",
+  change_plan: "تغيير الباقة",
+  update_invoice_status: "تحديث حالة الفاتورة",
 };

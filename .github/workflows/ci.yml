@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, test (SQLite) and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: artifacts/api-server
+        env:
+          MIRFAQ_DB_URL: file:./.data/ci.db
+        run: pnpm run db:generate
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+  postgres:
+    name: Test against PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mirfaq_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mirfaq_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify the generated PostgreSQL schema is up to date
+        working-directory: artifacts/api-server
+        run: |
+          pnpm run db:pg:sync
+          git diff --exit-code prisma/postgres/schema.prisma
+
+      - name: Verify the PostgreSQL migrations match the schema
+        working-directory: artifacts/api-server
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE mirfaq_shadow;'
+          pnpm exec prisma migrate diff \
+            --from-migrations ./prisma/postgres/migrations \
+            --to-schema-datamodel ./prisma/postgres/schema.prisma \
+            --shadow-database-url "postgresql://postgres:postgres@localhost:5432/mirfaq_shadow" \
+            --exit-code
+
+      - name: Test
+        working-directory: artifacts/api-server
+        run: pnpm run test

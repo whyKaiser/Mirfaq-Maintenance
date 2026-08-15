@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { logAction } from "../lib/audit";
 import { getFileUrl } from "../lib/storage";
 import { getMaintenanceRequestAccess } from "../lib/request-access";
+import { notify, organizationManagerIds, technicianUserId } from "../lib/notify";
 
 const router = Router();
 const MAX_COST_SAR = 10_000_000;
@@ -175,6 +176,17 @@ router.post("/requests", requireRole("resident"), async (req, res) => {
       entityType: "request",
       entityId: request.id,
       entityLabel: request.title,
+    });
+
+    await notify({
+      organizationId: request.organizationId,
+      userIds: await organizationManagerIds(request.organizationId),
+      actorId: req.session.userId!,
+      type: "request_created",
+      title: `بلاغ جديد: ${request.title}`,
+      body: `${request.property?.name ?? ""} — وحدة ${request.unit?.number ?? ""} · أولوية ${request.priority}`,
+      entityType: "request",
+      entityId: request.id,
     });
 
     res.status(201).json(fmtRequest(request));
@@ -349,6 +361,39 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
       });
     }
 
+    if (status && status !== existing.status) {
+      await notify({
+        organizationId: orgId,
+        userIds: [
+          existing.residentId,
+          await technicianUserId(request.technicianId),
+          ...(await organizationManagerIds(orgId)),
+        ],
+        actorId: userId,
+        type: "request_status_changed",
+        title: `تحديث حالة البلاغ: ${existing.title}`,
+        body: `الحالة تغيّرت من "${existing.status}" إلى "${status}".`,
+        entityType: "request",
+        entityId: existing.id,
+      });
+    }
+
+    if (technicianId !== undefined && technicianId !== existing.technicianId) {
+      const assignedUserId = await technicianUserId(technicianId);
+      await notify({
+        organizationId: orgId,
+        userIds: [assignedUserId, existing.residentId],
+        actorId: userId,
+        type: "request_assigned",
+        title: `إسناد البلاغ: ${existing.title}`,
+        body: technicianId
+          ? `تم إسناد البلاغ إلى ${request.technician?.user?.name ?? "فني"}.`
+          : "تم إلغاء إسناد الفني لهذا البلاغ.",
+        entityType: "request",
+        entityId: existing.id,
+      });
+    }
+
     res.json(fmtRequest(request));
   } catch (err) {
     req.log.error(err);
@@ -520,6 +565,20 @@ router.post(
         details: { rating },
       });
 
+      await notify({
+        organizationId: req.session.organizationId!,
+        userIds: [
+          ...(await organizationManagerIds(req.session.organizationId!)),
+          await technicianUserId(updated.technicianId),
+        ],
+        actorId: req.session.userId!,
+        type: "request_rated",
+        title: `تقييم البلاغ: ${request.title}`,
+        body: `قيّم الساكن البلاغ بـ ${rating} من 5.`,
+        entityType: "request",
+        entityId: request.id,
+      });
+
       res.json(fmtRequest(updated));
     } catch (err) {
       req.log.error(err);
@@ -595,6 +654,30 @@ router.post("/requests/:requestId/comments", requireAuth, async (req, res) => {
       },
       include: { author: { select: { name: true, role: true } } },
     });
+
+    const commented = await prisma.maintenanceRequest.findFirst({
+      where: {
+        id: req.params.requestId,
+        organizationId: req.session.organizationId!,
+      },
+      select: { id: true, title: true, residentId: true, technicianId: true },
+    });
+    if (commented) {
+      await notify({
+        organizationId: req.session.organizationId!,
+        userIds: [
+          commented.residentId,
+          await technicianUserId(commented.technicianId),
+          ...(await organizationManagerIds(req.session.organizationId!)),
+        ],
+        actorId: userId,
+        type: "request_commented",
+        title: `تعليق جديد على: ${commented.title}`,
+        body: `${comment.author.name}: ${comment.content.slice(0, 140)}`,
+        entityType: "request",
+        entityId: commented.id,
+      });
+    }
 
     res.status(201).json({
       id: comment.id,
