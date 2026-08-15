@@ -15,6 +15,8 @@ import reportsRouter from "./reports";
 import leadsRouter from "./leads";
 import publicUnitsRouter from "./public-units";
 import preventivePlansRouter from "./preventive-plans";
+import notificationsRouter from "./notifications";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -34,5 +36,7 @@ router.use(reportsRouter);
 router.use(leadsRouter);
 router.use(publicUnitsRouter);
 router.use(preventivePlansRouter);
+router.use(notificationsRouter);
+router.use(billingRouter);
 
 export default router;

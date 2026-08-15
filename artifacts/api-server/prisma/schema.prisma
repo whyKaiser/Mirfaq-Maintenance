@@ -26,6 +26,13 @@ model Organization {
   city       String   @default("الرياض")
   brandColor String   @default("#0891b2")
   logoUrl    String?
+
+  // ─── الاشتراك ───
+  planCode            String    @default("tajribi") // tajribi | asasi | ihtirafi | munsha'at
+  planStatus          String    @default("نشط") // نشط | موقوف | منتهٍ
+  planRenewsAt        DateTime?
+  planStartedAt       DateTime  @default(now())
+
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -36,6 +43,8 @@ model Organization {
   auditLogs       AuditLog[]
   leads           SalesLead[]
   preventivePlans PreventivePlan[]
+  notifications   Notification[]
+  invoices        Invoice[]
 }
 
 model User {
@@ -46,6 +55,8 @@ model User {
   passwordHash   String
   role           String // "manager" | "resident" | "technician"
   isActive       Boolean  @default(true)
+  notifyInApp    Boolean  @default(true)
+  notifyEmail    Boolean  @default(false)
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -58,6 +69,7 @@ model User {
   comments            RequestComment[]
   uploadedAttachments RequestAttachment[]
   auditLogs           AuditLog[]           @relation("AuditActor")
+  notifications       Notification[]
 }
 
 model Property {
@@ -222,4 +234,52 @@ model SalesLead {
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+}
+
+// ─── الإشعارات ────────────────────────────────────────────────────────────────
+// In-app notifications. Outbound channels (email/webhook) are dispatched by
+// src/lib/notify-channels.ts and never block the request that produced them.
+model Notification {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String // request_created | request_assigned | request_status_changed | request_commented | request_rated | plan_due
+  title          String
+  body           String
+  entityType     String? // "request" | "plan"
+  entityId       String?
+  readAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([organizationId, createdAt])
+}
+
+// ─── الفوترة ──────────────────────────────────────────────────────────────────
+// Monthly invoice per organization: subscription fee + maintenance costs
+// recorded on requests completed during the period.
+model Invoice {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  periodStart           DateTime
+  periodEnd             DateTime
+  planCode              String
+  subscriptionHalalas   Int       @default(0)
+  maintenanceHalalas    Int       @default(0)
+  vatHalalas            Int       @default(0)
+  totalHalalas          Int       @default(0)
+  requestsCount         Int       @default(0)
+  status                String    @default("مسودة") // مسودة | صادرة | مدفوعة
+  issuedAt              DateTime?
+  paidAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, periodStart])
+  @@index([organizationId, periodStart])
 }

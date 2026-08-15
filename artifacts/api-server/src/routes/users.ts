@@ -4,6 +4,7 @@ import { requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { logAction } from "../lib/audit";
 import { getPasswordPolicyError } from "../lib/password-policy";
+import { checkLimit } from "../lib/plan-usage";
 
 const router = Router();
 
@@ -65,6 +66,15 @@ router.post("/users", requireRole("manager"), async (req, res) => {
     }
     if (role === "technician" && !specialty?.trim()) {
       return res.status(400).json({ error: "التخصص مطلوب للفني" });
+    }
+
+    if (role === "technician") {
+      const limit = await checkLimit(req.session.organizationId!, "technicians");
+      if (!limit.allowed) {
+        return res
+          .status(402)
+          .json({ error: limit.message, limit: limit.limit, current: limit.current });
+      }
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });

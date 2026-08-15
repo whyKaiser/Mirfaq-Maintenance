@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { AuthProvider } from '@/context/AuthContext';
+import { PwaStatus } from '@/components/PwaStatus';
 
 import NotFound from '@/pages/not-found';
 import LandingPage from '@/pages/landing';
@@ -47,6 +48,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <Router />
           </WouterRouter>
+          <PwaStatus />
           <Toaster />
         </TooltipProvider>
       </AuthProvider>

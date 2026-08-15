@@ -14,6 +14,7 @@ import type { MaintenanceRequest } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { NotificationBell } from '@/components/NotificationBell';
 
 const STATUS_STYLES: Record<string, { label: string; style: string; icon: React.ReactNode }> = {
   'معلّقة':      { label: 'معلّقة',      style: 'bg-amber-100 text-amber-800 border-amber-200', icon: <Clock className="w-3 h-3" /> },
@@ -420,13 +421,16 @@ function ResidentContent() {
               <p className="text-xs text-muted-foreground">وحدة {requests[0]?.unitNumber ?? '—'}</p>
             </div>
           </div>
-          <button
-            onClick={() => doLogout()}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            خروج
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="w-auto"><NotificationBell /></div>
+            <button
+              onClick={() => doLogout()}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              خروج
+            </button>
+          </div>
         </div>
       </header>
 

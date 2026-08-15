@@ -3,6 +3,7 @@ import { Router } from "express";
 import { requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { logAction } from "../lib/audit";
+import { checkLimit } from "../lib/plan-usage";
 
 const router = Router();
 
@@ -78,6 +79,13 @@ router.post(
       };
       if (!number?.trim() || floor === undefined) {
         return res.status(400).json({ error: "رقم الوحدة والطابق مطلوبان" });
+      }
+
+      const limit = await checkLimit(req.session.organizationId!, "units");
+      if (!limit.allowed) {
+        return res
+          .status(402)
+          .json({ error: limit.message, limit: limit.limit, current: limit.current });
       }
 
       // Validate resident belongs to same org

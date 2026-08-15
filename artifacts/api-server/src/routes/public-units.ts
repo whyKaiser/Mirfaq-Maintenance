@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { prisma } from "../lib/prisma";
+import { notify, organizationManagerIds } from "../lib/notify";
 
 const router = Router();
 const WINDOW_MS = 15 * 60 * 1000;
@@ -212,6 +213,16 @@ router.post(
           reporterName: cleanName,
           reporterPhone: cleanPhone,
         },
+      });
+
+      await notify({
+        organizationId: unit.property.organizationId,
+        userIds: await organizationManagerIds(unit.property.organizationId),
+        type: "request_created",
+        title: `بلاغ جديد عبر QR: ${request.title}`,
+        body: `${unit.property.name} — وحدة ${unit.number} · مُبلّغ: ${cleanName}`,
+        entityType: "request",
+        entityId: request.id,
       });
 
       res.status(201).json({
