@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @workspace/api-server --filter @workspace/mirfaq run dev",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",

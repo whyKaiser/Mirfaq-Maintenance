@@ -38,7 +38,7 @@
 
 ## التشغيل محليًا
 
-المتطلبات: Node.js 20 أو أحدث وpnpm 11.
+المتطلبات: Node.js 22 أو أحدث وpnpm 11 (pnpm 11 يعتمد على `node:sqlite` المتوفرة من Node 22).
 
 ```bash
 pnpm install
