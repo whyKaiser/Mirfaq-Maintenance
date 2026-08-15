@@ -1,24 +1,13 @@
-// Canonical Prisma schema for مِرفق — property maintenance management.
-//
-// This file targets SQLite, which is what `pnpm run dev` uses so the app runs
-// with no database to install. The PostgreSQL schema used in production is
-// GENERATED from this one — never edit it by hand:
-//
-//   pnpm run db:pg:sync      regenerate prisma/postgres/schema.prisma
-//   pnpm run db:pg:migrate   create/refresh the PostgreSQL migration
-//   pnpm run db:pg:deploy    apply migrations to MIRFAQ_DB_URL
-//
-// `pnpm run db:generate` picks the schema that matches MIRFAQ_DB_URL, so the
-// application code and the Prisma client API are identical on both.
-//
-// To migrate file storage to S3: see src/lib/storage.ts
+// GENERATED FILE — do not edit.
+// Produced from prisma/schema.prisma by scripts/sync-postgres-schema.mjs.
+// Edit the SQLite schema and run: pnpm run db:pg:sync
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("MIRFAQ_DB_URL")
 }
 

@@ -18,30 +18,52 @@
 
 الخادم يرفض الإقلاع في الإنتاج إذا كان `SESSION_SECRET` أقصر من 32 حرفًا.
 
-## 2. الانتقال إلى PostgreSQL
+## 2. قاعدة البيانات: SQLite أو PostgreSQL
 
-SQLite مناسب للعرض التجريبي فقط: كتابة واحدة في اللحظة، والملف مرتبط بالجهاز.
-للانتقال:
+المنصة تدعم القاعدتين من نفس الكود. الفرق الوحيد هو رابط `MIRFAQ_DB_URL`:
 
-1. في `artifacts/api-server/prisma/schema.prisma` غيّر:
-   ```prisma
-   datasource db {
-     provider = "postgresql"
-     url      = env("MIRFAQ_DB_URL")
-   }
-   ```
-2. احذف مجلد `prisma/migrations` وأعد توليد هجرة أولى لـ PostgreSQL:
+| البيئة | الرابط | ملاحظة |
+| --- | --- | --- |
+| تطوير محلي | `file:./.data/mirfaq-local.db` | يعمل بدون تثبيت أي خدمة. |
+| إنتاج | `postgresql://USER:PASS@HOST:5432/mirfaq` | الموصى به مع عملاء فعليين. |
+
+المخطط المرجعي هو `prisma/schema.prisma` (SQLite). مخطط PostgreSQL في
+`prisma/postgres/schema.prisma` **مولَّد منه آليًا** ولا يُحرَّر يدويًا، فلا يمكن
+أن يختلف الاثنان. أوامر Prisma تختار المخطط المناسب حسب `MIRFAQ_DB_URL`.
+
+### التشغيل على PostgreSQL
+
+```bash
+cd artifacts/api-server
+export MIRFAQ_DB_URL="postgresql://USER:PASS@HOST:5432/mirfaq"
+
+pnpm run db:pg:deploy    # يطبّق الهجرات على القاعدة
+pnpm run db:generate     # يولّد عميل Prisma المناسب للمزوّد
+pnpm run db:pg:seed      # اختياري: بيانات تجريبية
+pnpm run build && pnpm run start
+```
+
+### تعديل المخطط لاحقًا
+
+1. عدّل `prisma/schema.prisma` فقط.
+2. أنشئ هجرة SQLite كالمعتاد في `prisma/migrations/`.
+3. حدّث مخطط PostgreSQL وأنشئ هجرته:
    ```bash
-   cd artifacts/api-server
-   MIRFAQ_DB_URL="postgresql://…" pnpm exec prisma migrate dev --name init_postgres
+   pnpm run db:pg:sync
+   SHADOW_DATABASE_URL="postgresql://…/mirfaq_shadow" pnpm run db:pg:migrate \
+     > prisma/postgres/migrations/$(date -u +%Y%m%d%H%M%S)_change/migration.sql
    ```
-   (الهجرات الحالية مكتوبة بلهجة SQLite ولا تعمل على PostgreSQL.)
-3. انقل البيانات القائمة إن وُجدت، ثم شغّل `prisma migrate deploy` على خادم الإنتاج.
+   (`db:pg:migrate` يطبع فرق SQL بين الهجرات الحالية والمخطط الجديد.)
 
-نقاط تتغير مع PostgreSQL:
+الـ CI يمنع الانحراف: يتحقق أن المخطط المولَّد مطابق، وأن هجرات PostgreSQL تغطي
+المخطط بالكامل (`prisma migrate diff --exit-code`)، ويشغّل كل الاختبارات على
+PostgreSQL 16 حقيقي إضافة إلى SQLite.
 
-- أعمدة `DateTime` تصبح `timestamptz` — لا تغيير مطلوب في الكود.
-- كل المبالغ مخزّنة بالهللات كأعداد صحيحة، فلا مشكلة تقريب.
+### ملاحظات على الفروق
+
+- كل المبالغ مخزّنة بالهللات كأعداد صحيحة، فلا فرق في التقريب بين المزوّدين.
+- أعمدة `DateTime` تصبح `timestamp(3)` — لا تغيير مطلوب في الكود.
+- SQLite يسمح بكاتب واحد في اللحظة؛ هذا سبب كافٍ وحده للانتقال عند وجود عملاء.
 
 ## 3. المرفقات والتخزين
 
@@ -68,8 +90,21 @@ pnpm run build       # بناء الخادم والواجهة
 ```
 
 الاختبارات تنشئ قاعدة SQLite مؤقتة وتطبّق عليها الهجرات، ثم تحذفها — لا تلمس
-قاعدة بياناتك المحلية. نفس الأوامر الثلاثة تُشغَّل في GitHub Actions عبر
-`.github/workflows/ci.yml` على كل دفعة و pull request.
+قاعدة بياناتك المحلية.
+
+لتشغيل نفس الاختبارات على PostgreSQL:
+
+```bash
+cd artifacts/api-server
+TEST_DATABASE_URL="postgresql://…/mirfaq_test" pnpm run test
+```
+
+يُعاد إنشاء الـ schema قبل كل تشغيل، فوجّهه لقاعدة اختبار فقط ولا توجّهه أبدًا
+لقاعدة فيها بيانات فعلية.
+
+`.github/workflows/ci.yml` يشغّل على كل دفعة و pull request: الفحص والاختبارات
+والبناء على SQLite، ثم الاختبارات كاملة على PostgreSQL 16 مع فحص انحراف المخطط
+والهجرات.
 
 ## 6. الأمان التشغيلي
 

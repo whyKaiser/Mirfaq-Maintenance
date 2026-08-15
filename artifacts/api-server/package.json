@@ -9,13 +9,17 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "db:generate": "prisma generate",
+    "db:generate": "node ./scripts/prisma-schema.mjs generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:pg:sync": "node ./scripts/sync-postgres-schema.mjs",
+    "db:pg:migrate": "node ./scripts/sync-postgres-schema.mjs && prisma migrate diff --from-migrations ./prisma/postgres/migrations --to-schema-datamodel ./prisma/postgres/schema.prisma --shadow-database-url \"$SHADOW_DATABASE_URL\" --script",
+    "db:pg:deploy": "node ./scripts/sync-postgres-schema.mjs && prisma migrate deploy --schema ./prisma/postgres/schema.prisma",
+    "db:pg:seed": "tsx prisma/seed.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
