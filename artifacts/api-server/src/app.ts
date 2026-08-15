@@ -4,6 +4,7 @@ import session from "express-session";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { mountClient } from "./lib/client-assets";
 
 // Extend session type
 import "./types/session.d";
@@ -88,5 +89,28 @@ app.use(
 );
 
 app.use("/api", router);
+
+// JSON error handler for the API. Four parameters, so Express registers it as
+// an error handler rather than ordinary middleware.
+app.use(
+  "/api",
+  (
+    err: unknown,
+    req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    req.log?.error(err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: "خطأ في الخادم" });
+  },
+);
+
+// Optional: serve the built client from this process (SERVE_CLIENT=1).
+// Mounted after the API router so /api always takes precedence.
+const clientDir = mountClient(app);
+if (clientDir) {
+  logger.info({ clientDir }, "Serving web client");
+}
 
 export default app;

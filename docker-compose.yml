@@ -1,0 +1,59 @@
+# مِرفق — self-hosted stack: the app plus PostgreSQL.
+#
+#   cp .env.docker.example .env
+#   # set SESSION_SECRET and POSTGRES_PASSWORD to real values first
+#   docker compose up -d
+#   docker compose exec app node ./scripts/prisma-schema.mjs migrate deploy
+#
+# Attachments are kept on the mirfaq-uploads volume. Running more than one
+# replica requires S3 storage instead — see docs/production.md.
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mirfaq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-mirfaq}
+    volumes:
+      - mirfaq-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mirfaq}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Not published: only the app needs to reach the database.
+
+  app:
+    build:
+      context: .
+      args:
+        # Selects the PostgreSQL Prisma client at image build time.
+        MIRFAQ_DB_URL: postgresql://placeholder@db:5432/placeholder
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MIRFAQ_DB_URL: postgresql://${POSTGRES_USER:-mirfaq}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mirfaq}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      APP_ORIGINS: ${APP_ORIGINS:?APP_ORIGINS is required}
+      PORT: 5000
+      # Optional integrations — see .env.docker.example.
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_PREFIX: ${S3_PREFIX:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    volumes:
+      - mirfaq-uploads:/app/uploads
+
+volumes:
+  mirfaq-db:
+  mirfaq-uploads:

@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.github
+**/.data
+**/uploads
+*.log
+attached_assets
+docs/assets
+.replit
+.replitignore
