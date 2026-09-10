@@ -39,4 +39,11 @@ router.use(preventivePlansRouter);
 router.use(notificationsRouter);
 router.use(billingRouter);
 
+// Unknown /api paths must answer as JSON. Without this Express falls through
+// to its default HTML error page, which an API client cannot parse — and with
+// SERVE_CLIENT=1 that page would surface instead of a usable error.
+router.use((_req, res) => {
+  res.status(404).json({ error: "المسار غير موجود" });
+});
+
 export default router;

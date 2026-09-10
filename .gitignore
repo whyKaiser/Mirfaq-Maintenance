@@ -54,3 +54,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local docker environment
+.env
+
+# ...but the sample file must be tracked (a broader **/.env.* rule hides it).
+!.env.docker.example

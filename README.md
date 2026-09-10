@@ -82,6 +82,18 @@ TEST_DATABASE_URL="postgresql://…/mirfaq_test" pnpm run test
 الاختبارات تنشئ قاعدة SQLite مؤقتة وتطبّق عليها الهجرات ثم تحذفها، فلا تتأثر
 قاعدة بياناتك المحلية. نفس الأوامر تُشغَّل تلقائيًا في GitHub Actions.
 
+## النشر
+
+```bash
+cp .env.docker.example .env      # اضبط SESSION_SECRET و POSTGRES_PASSWORD و APP_ORIGINS
+docker compose up -d --build
+docker compose exec app node ./scripts/prisma-schema.mjs migrate deploy
+```
+
+حاوية واحدة تقدّم الـ API والواجهة معًا مع PostgreSQL بجانبها. **شغّلها خلف
+HTTPS** — كوكي الجلسة في الإنتاج عليه `Secure` ولن يعمل على HTTP.
+التفاصيل في [`docs/production.md`](docs/production.md).
+
 ## متغيرات الإنتاج
 
 انسخ `artifacts/api-server/.env.example` واضبط:
