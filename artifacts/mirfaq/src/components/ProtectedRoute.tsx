@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useGetMe, getGetMeQueryKey } from '@workspace/api-client-react';
 import { useAuth } from '@/context/AuthContext';
 import type { ExtAuthUser } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const { language } = useLanguage();
   const { user, setUser } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -49,7 +51,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground text-sm">جارٍ التحقق من الهوية...</p>
+          <p className="text-muted-foreground text-sm">{language === 'en' ? 'Checking your session…' : 'جارٍ التحقق من الهوية...'}</p>
         </div>
       </div>
     );

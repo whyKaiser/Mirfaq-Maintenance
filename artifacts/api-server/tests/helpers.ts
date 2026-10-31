@@ -24,6 +24,21 @@ export interface Fixture {
 
 /** Wipes every table so each test file starts from a known state. */
 export async function resetDatabase(): Promise<void> {
+  await prisma.agentEvent.deleteMany();
+  await prisma.agentDraft.deleteMany();
+  await prisma.agentLink.deleteMany();
+  await prisma.agentClaim.deleteMany();
+  await prisma.agentClosure.deleteMany();
+  await prisma.agentIntake.deleteMany();
+  await prisma.agentAvailability.deleteMany();
+  await prisma.agentDemoPolicy.deleteMany();
+  await prisma.agentDemoFixture.deleteMany();
+  await prisma.agentCommand.deleteMany();
+  await prisma.agentAudit.deleteMany();
+  await prisma.agentReportSnapshot.deleteMany();
+  await prisma.agentSafetyReview.deleteMany();
+  await prisma.agentOrder.deleteMany();
+  await prisma.agentAsset.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -42,11 +57,12 @@ export async function resetDatabase(): Promise<void> {
 export async function seedFixture(
   planCode: string = "aamal",
   suffix = "a",
+  organizationId?: string,
 ): Promise<Fixture> {
   const passwordHash = await bcrypt.hash(PASSWORD, 4);
 
   const org = await prisma.organization.create({
-    data: { name: `منشأة اختبار ${suffix}`, planCode },
+    data: { ...(organizationId ? { id: organizationId } : {}), name: `منشأة اختبار ${suffix}`, planCode },
   });
 
   const managerEmail = `manager-${suffix}@test.sa`;

@@ -1,0 +1,17 @@
+{
+  "scope": "on-demand bounded deterministic follow-up; not live model evaluation",
+  "frozenBeforeImplementation": "2026-10-31",
+  "baseline": "existing report shows blockers but does not execute follow-up",
+  "cases": [
+    {"id":"absent-qualified","input":"recorded absent technician, one eligible replacement","expected":"one verified reassignment of existing order; receipt unconfirmed"},
+    {"id":"absent-none","input":"recorded absent technician, no eligible replacement","expected":"one escalation; repeat does not repeat action"},
+    {"id":"part","input":"recorded part unavailable","expected":"pending manager approval; no purchase or reassignment"},
+    {"id":"unblocked","input":"assigned order with no recorded blocker","expected":"unchanged"},
+    {"id":"hazard","input":"recorded absent technician and newly reported sparks","expected":"no reassignment; safety review required"},
+    {"id":"foreign-tenant","input":"manager A while order belongs to tenant B","expected":"no foreign order read or mutation"},
+    {"id":"wrong-role","input":"resident invokes follow-up","expected":"denied without changes"},
+    {"id":"repeat","input":"repeat after successful reassignment","expected":"no extra order or reassignment"},
+    {"id":"unknown-blocker","input":"recorded other blocker","expected":"manager review; no reassignment"},
+    {"id":"duplicate-reports","input":"existing linked duplicate request","expected":"no new order and original link preserved"}
+  ]
+}

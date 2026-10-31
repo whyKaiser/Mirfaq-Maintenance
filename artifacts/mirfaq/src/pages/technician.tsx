@@ -91,7 +91,7 @@ function CompletionUploader({ requestId, onConfirm }: { requestId: string; onCon
     try {
       if (files.length > 0) {
         const fd = new FormData();
-        files.forEach(f => fd.append('files', f));
+        files.forEach(f => fd.append('images', f));
         fd.append('attachmentType', 'completion');
         const res = await fetch(`/api/requests/${requestId}/attachments`, {
           method: 'POST', credentials: 'include', body: fd,
@@ -288,10 +288,11 @@ function TechnicianContent() {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-auto"><NotificationBell /></div>
-            <button onClick={() => refetch()} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+            <button aria-label="تحديث المهام" onClick={() => refetch()} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
               <RefreshCcw className="w-4 h-4" />
             </button>
             <button
+              aria-label="تسجيل الخروج"
               onClick={() => doLogout()}
               className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive transition-colors"
             >
@@ -302,6 +303,7 @@ function TechnicianContent() {
       </header>
 
       <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+        <a href="/agent-evidence" className="inline-block rounded-lg border border-teal-700 px-4 py-2 text-teal-700">تقرير أمر الوكيل المنظم</a>
 
         {/* Summary */}
         <div className="grid grid-cols-2 gap-3">

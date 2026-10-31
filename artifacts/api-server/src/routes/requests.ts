@@ -259,6 +259,11 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
       description?: string;
     };
 
+    if (status === 'مكتملة') {
+      const agentOrder = await prisma.agentOrder.findFirst({ where: { requestId: existing.id, organizationId: orgId }, select: { id: true } });
+      if (agentOrder) return res.status(409).json({ error: 'أوامر الوكيل تحتاج تقريرًا منظمًا ومراجعة المسؤول قبل الإغلاق.' });
+    }
+
     if (
       status !== undefined &&
       (typeof status !== "string" || !REQUEST_STATUSES.has(status))
@@ -290,6 +295,16 @@ router.patch("/requests/:id", requireAuth, async (req, res) => {
           .status(403)
           .json({ error: "لا يمكنك تغيير الفني أو الأولوية" });
       }
+    }
+
+    // A manager may only assign an active technician from the same organization.
+    if (technicianId !== undefined && technicianId !== null && technicianId !== "") {
+      if (typeof technicianId !== "string") return res.status(400).json({ error: "الفني غير صالح" });
+      const technician = await prisma.technicianProfile.findFirst({
+        where: { id: technicianId, user: { organizationId: orgId, isActive: true, role: "technician" } },
+        select: { id: true },
+      });
+      if (!technician) return res.status(400).json({ error: "الفني غير متاح لهذه الجهة" });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

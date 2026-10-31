@@ -61,8 +61,8 @@ export default defineConfig({
       strict: true,
     },
     proxy: {
-      '/api': 'http://127.0.0.1:5000',
-      '/uploads': 'http://127.0.0.1:5000',
+      '/api': process.env.MIRFAQ_API_PROXY || 'http://127.0.0.1:5000',
+      '/uploads': process.env.MIRFAQ_API_PROXY || 'http://127.0.0.1:5000',
     },
   },
   preview: {

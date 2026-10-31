@@ -4,16 +4,21 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { AuthProvider } from '@/context/AuthContext';
 import { PwaStatus } from '@/components/PwaStatus';
+import { LanguageProvider, LanguageSwitch, useLanguage } from '@/context/LanguageContext';
+import { EnglishLanding, EnglishLogin, EnglishManager, EnglishResident, EnglishTechnician } from '@/pages/english-demo';
 
 import NotFound from '@/pages/not-found';
 import LandingPage from '@/pages/landing';
 import LoginPage from '@/pages/login';
-import ManagerDashboard from '@/pages/manager';
+import ManagerDashboard, { AdvancedAdminPage } from '@/pages/manager';
 import ResidentDashboard from '@/pages/resident';
 import TechnicianDashboard from '@/pages/technician';
 import PrintWorkOrder from '@/pages/print-work-order';
 import PrintMonthly from '@/pages/print-monthly';
 import PublicReportPage from '@/pages/public-report';
+import MaintenanceAdvicePage from '@/pages/maintenance-advice';
+import AgentWorkflowPage from '@/pages/agent-workflow';
+import AgentEvidencePage from '@/pages/agent-evidence';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,14 +30,19 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
+  const { language } = useLanguage();
   return (
     <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/login" component={LoginPage} />
+      <Route path="/" component={language === 'en' ? EnglishLanding : LandingPage} />
+      <Route path="/login" component={language === 'en' ? EnglishLogin : LoginPage} />
       <Route path="/report/:token" component={PublicReportPage} />
-      <Route path="/manager" component={ManagerDashboard} />
-      <Route path="/resident" component={ResidentDashboard} />
-      <Route path="/technician" component={TechnicianDashboard} />
+      <Route path="/manager" component={language === 'en' ? EnglishManager : ManagerDashboard} />
+      <Route path="/manager/advanced" component={AdvancedAdminPage} />
+      <Route path="/maintenance-advice" component={MaintenanceAdvicePage} />
+      <Route path="/agent-workflow" component={AgentWorkflowPage} />
+      <Route path="/agent-evidence" component={AgentEvidencePage} />
+      <Route path="/resident" component={language === 'en' ? EnglishResident : ResidentDashboard} />
+      <Route path="/technician" component={language === 'en' ? EnglishTechnician : TechnicianDashboard} />
       <Route path="/print/work-order/:requestId" component={PrintWorkOrder} />
       <Route path="/print/monthly" component={PrintMonthly} />
       <Route component={NotFound} />
@@ -43,15 +53,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <LanguageProvider><AuthProvider>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
             <Router />
           </WouterRouter>
           <PwaStatus />
           <Toaster />
+          <LanguageSwitch />
         </TooltipProvider>
-      </AuthProvider>
+      </AuthProvider></LanguageProvider>
     </QueryClientProvider>
   );
 }

@@ -277,7 +277,7 @@ function AttachmentUploader({ requestId, onDone }: { requestId: string; onDone: 
     setIsUploading(true); setError('');
     try {
       const fd = new FormData();
-      files.forEach(f => fd.append('files', f));
+      files.forEach(f => fd.append('images', f));
       fd.append('attachmentType', 'initial');
       const res = await fetch(`/api/requests/${requestId}/attachments`, {
         method: 'POST',

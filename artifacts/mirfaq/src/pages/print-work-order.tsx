@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
 import { useParams } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface WorkOrderReport {
   request: {
@@ -22,32 +22,33 @@ interface WorkOrderReport {
   attachments: { id: string; fileName: string; attachmentType: string }[];
 }
 
+type WorkOrderApi = { org: WorkOrderReport['organization']; request: WorkOrderReport['request'] & { propertyName:string;propertyAddress:string;unitNumber:string;unitFloor:number;residentName:string;residentPhone?:string|null;technicianName:string|null;technicianPhone:string|null;technicianSpecialty:string|null;comments:Array<{authorName:string;content:string;createdAt:string}>;attachments:WorkOrderReport['attachments'] } };
+function adaptWorkOrder(raw:WorkOrderApi):WorkOrderReport {
+  const r=raw.request;
+  return {organization:raw.org,request:r,property:{name:r.propertyName,address:r.propertyAddress},unit:{number:r.unitNumber,floor:r.unitFloor},resident:{name:r.residentName,email:'',phone:r.residentPhone},technician:r.technicianName ? {name:r.technicianName,phone:r.technicianPhone,specialty:r.technicianSpecialty || ''} : null,comments:r.comments.map((comment,index)=>({...comment,id:String(index)})),attachments:r.attachments};
+}
+
 export default function PrintWorkOrder() {
+  const { language } = useLanguage();
   const { requestId } = useParams<{ requestId: string }>();
 
   const { data, isLoading, isError } = useQuery<WorkOrderReport>({
     queryKey: ['/api/reports/work-order', requestId],
     queryFn: () =>
       fetch(`/api/reports/work-order/${requestId}`, { credentials: 'include' })
-        .then(r => { if (!r.ok) throw new Error('Not found'); return r.json() as Promise<WorkOrderReport>; }),
+        .then(async r => { if (!r.ok) throw new Error('Not found'); return adaptWorkOrder(await r.json() as WorkOrderApi); }),
     retry: false,
   });
 
-  useEffect(() => {
-    if (!data) return;
-    const timer = setTimeout(() => window.print(), 600);
-    return () => clearTimeout(timer);
-  }, [data]);
-
   if (isLoading) return (
-    <div className="flex items-center justify-center min-h-screen font-sans" dir="rtl">
-      <p className="text-muted-foreground">جارٍ تحميل أمر العمل…</p>
+    <div className="flex items-center justify-center min-h-screen font-sans" dir={language === 'en' ? 'ltr' : 'rtl'}>
+      <p className="text-muted-foreground">{language === 'en' ? 'Loading work order…' : 'جارٍ تحميل أمر العمل…'}</p>
     </div>
   );
 
   if (isError || !data) return (
-    <div className="flex items-center justify-center min-h-screen font-sans" dir="rtl">
-      <p className="text-destructive">تعذّر تحميل البلاغ</p>
+    <div className="flex items-center justify-center min-h-screen font-sans" dir={language === 'en' ? 'ltr' : 'rtl'}>
+      <p className="text-destructive">{language === 'en' ? 'Could not load the report.' : 'تعذّر تحميل البلاغ'}</p>
     </div>
   );
 
@@ -57,6 +58,14 @@ export default function PrintWorkOrder() {
     'معلّقة': 'معلّقة', 'قيد التنفيذ': 'قيد التنفيذ', 'مكتملة': 'مكتملة',
   };
   const PRIORITY_AR: Record<string, string> = { 'عاجل': 'عاجل 🔴', 'عادي': 'عادي' };
+
+  if (language === 'en') {
+    const status: Record<string,string>={'معلّقة':'Pending','قيد التنفيذ':'In progress','مكتملة':'Completed'};
+    const priority: Record<string,string>={'عاجل':'Urgent','عادي':'Normal'};
+    const category: Record<string,string>={'تكييف':'HVAC','سباكة':'Plumbing','كهرباء':'Electrical','أخرى':'Other'};
+    const date=(value:string)=>new Intl.DateTimeFormat('en',{dateStyle:'long'}).format(new Date(value));
+    return <main dir="ltr" className="mx-auto max-w-3xl space-y-5 bg-white p-8 text-sm text-slate-900"><style>{'@media print { .no-print { display:none!important } @page { margin:1.5cm } }'}</style><div className="no-print flex gap-2"><button className="rounded bg-teal-700 px-4 py-2 text-white" onClick={()=>window.print()}>Print / export PDF</button><button className="rounded border px-4 py-2" onClick={()=>window.close()}>Close</button></div><header className="flex justify-between"><div><h1 className="text-2xl font-bold" dir="auto">{organization.name}</h1><p dir="auto">{organization.city} {organization.phone || ''}</p></div><div><p>Work order</p><strong>{request.id.slice(-8).toUpperCase()}</strong><p>Created: {date(request.createdAt)}</p></div></header><section className="border-t pt-4"><p>Status: {status[request.status] || request.status} · Priority: {priority[request.priority] || request.priority} · Category: {category[request.category] || request.category}</p><h2 className="mt-2 text-xl font-bold" dir="auto">{request.title}</h2><p>Original report:</p><p dir="auto">{request.description}</p></section><div className="grid grid-cols-3 gap-3"><section className="rounded bg-slate-50 p-3"><h3 className="font-bold">Location</h3><p dir="auto">{property?.name || '—'}</p><p dir="auto">{property?.address || ''}</p><p>Unit {unit?.number || '—'} · Floor {unit?.floor ?? '—'}</p></section><section className="rounded bg-slate-50 p-3"><h3 className="font-bold">Resident</h3><p dir="auto">{resident?.name || '—'}</p><p>{resident?.phone || ''}</p><p>{resident?.email || ''}</p></section><section className="rounded bg-slate-50 p-3"><h3 className="font-bold">Assigned technician</h3><p dir="auto">{technician?.name || 'Not assigned'}</p><p dir="auto">{category[technician?.specialty || ''] || technician?.specialty || ''}</p><p>{technician?.phone || ''}</p></section></div><section><h3 className="font-bold">Comments ({comments.length})</h3>{comments.length===0?<p>No comments.</p>:comments.map(c=><article key={c.id} className="mt-2 rounded bg-slate-50 p-2"><p><span dir="auto">{c.authorName}</span> · {date(c.createdAt)}</p><p dir="auto">{c.content}</p></article>)}</section><section><h3 className="font-bold">Attachments ({attachments.length})</h3>{attachments.length===0?<p>No attachments.</p>:attachments.map(a=><p key={a.id}>📎 {a.fileName} · {a.attachmentType === 'completion'?'Completion':'Initial report'}</p>)}<p>Attachment contents are not inspected by the agent.</p></section><div className="grid grid-cols-2 gap-6 border-t pt-6"><p>Technician signature: ____________________</p><p>Manager signature: ____________________</p></div><p className="text-center text-xs text-slate-500">Generated by Mirfaq · {date(new Date().toISOString())}</p></main>;
+  }
 
   return (
     <div className="font-sans p-8 max-w-3xl mx-auto text-sm" dir="rtl">

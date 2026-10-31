@@ -12,6 +12,9 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const serverRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -36,9 +39,10 @@ const schema = isPostgres
   : path.join(serverRoot, "prisma", "schema.prisma");
 
 const result = spawnSync(
-  "pnpm",
-  ["exec", "prisma", ...process.argv.slice(2), "--schema", schema],
-  { cwd: serverRoot, stdio: "inherit", env: process.env },
+  process.execPath,
+  [require.resolve("prisma/build/index.js"), ...process.argv.slice(2), "--schema", schema],
+  { cwd: serverRoot, stdio: "inherit", env: { ...process.env, RUST_LOG: process.env.RUST_LOG || "info" } },
 );
 
+if (result.error) console.error(result.error);
 process.exit(result.status ?? 1);

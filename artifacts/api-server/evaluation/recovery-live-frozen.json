@@ -1,0 +1,33 @@
+{
+  "frozenBeforeExecution": "2026-10-31",
+  "purpose": "Two synthetic UI recovery cases; not blind, not a performance estimate",
+  "model": "gpt-5.6-luna",
+  "maximumNewRequestsCombined": 8,
+  "priorTotalRequests": 33,
+  "expectedNormalRequests": [5, 3],
+  "noAutomaticRetries": true,
+  "cases": [
+    {
+      "id": "recovery-live-safe-20261031",
+      "title": "Recovery evaluation A - kitchen faucet",
+      "description": "The kitchen faucet leaks from its base in unit 3B. The assigned technician is recorded absent. Restore scheduling only; technician receipt must be confirmed separately.",
+      "issue": "water_leak",
+      "blocker": "technician_absent",
+      "candidate": "recovery-eval-plumber",
+      "expected": {"modelDecision": "reassign", "finalState": "assigned", "revision": 2, "technicianId": "recovery-eval-plumber", "orderCount": 1, "receipt": "not_confirmed", "replanEvents": 1},
+      "baseline": "Existing deterministic replan on an identical database snapshot should choose the same sole eligible replacement."
+    },
+    {
+      "id": "recovery-live-review-20261031",
+      "title": "Recovery evaluation B - HVAC absence",
+      "description": "The air conditioner in unit 3B drips condensate. The assigned HVAC technician is recorded absent. The available replacement is a plumber, with no HVAC qualification. Manager coordination is required if no qualified replacement is available.",
+      "issue": "hvac_leak",
+      "blocker": "technician_absent",
+      "candidate": null,
+      "expected": {"modelDecision": "manager_review", "finalState": "blocked", "revision": 1, "orderCount": 1, "receipt": "not_confirmed", "replanEvents": 0},
+      "baseline": "Deterministic replan escalates and records revision 2; both must preserve the original assignee and blocked state. Model path records review in run/audit without rewriting the order."
+    }
+  ],
+  "metrics": ["tool sequence", "model-selected candidate", "proposal revision or rejection", "persisted state", "repeated-click additional requests and writes", "request count", "reported usage", "conservative cost settlement", "elapsed UI time"],
+  "limitations": ["Two cases cannot establish model advantage or general accuracy.", "A scripted simulator is separate from live evaluation.", "No candidate availability or physical outcome is a field measurement."]
+}
