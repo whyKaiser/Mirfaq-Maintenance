@@ -54,3 +54,15 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local agent runtime and evaluation outputs
+**/.data/
+**/*.db-wal
+**/*.db-shm
+**/evaluation/results/
+**/mirfaq-model-budget*.json*
+**/*.journal.jsonl
+**/*.sqlite
+**/*.sqlite3
+**/*.sqlite-wal
+**/*.sqlite-shm

@@ -58,6 +58,7 @@ app.use(
       callback(new Error("Origin is not allowed by CORS"));
     },
     credentials: true,
+    exposedHeaders: ["X-Agent-Audit-Status"],
   }),
 );
 

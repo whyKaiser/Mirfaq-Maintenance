@@ -1,0 +1,55 @@
+CREATE TABLE "AgentAsset" (
+  "id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "unitId" TEXT NOT NULL,
+  "tag" TEXT NOT NULL, "kind" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX "AgentAsset_organizationId_unitId_tag_key" ON "AgentAsset"("organizationId", "unitId", "tag");
+CREATE INDEX "AgentAsset_organizationId_idx" ON "AgentAsset"("organizationId");
+CREATE TABLE "AgentOrder" (
+  "id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "requestId" TEXT NOT NULL,
+  "assetId" TEXT NOT NULL, "issueCode" TEXT NOT NULL, "priority" TEXT NOT NULL, "technicianId" TEXT NOT NULL,
+  "state" TEXT NOT NULL DEFAULT 'assigned', "revision" INTEGER NOT NULL DEFAULT 0, "deliveryState" TEXT NOT NULL DEFAULT 'not_confirmed',
+  "idempotencyKey" TEXT NOT NULL, "inputHash" TEXT NOT NULL, "reportHash" TEXT NOT NULL, "activeKey" TEXT, "blocker" TEXT, "nextStep" TEXT, "dueAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL
+);
+CREATE UNIQUE INDEX "AgentOrder_requestId_key" ON "AgentOrder"("requestId");
+CREATE UNIQUE INDEX "AgentOrder_activeKey_key" ON "AgentOrder"("activeKey");
+CREATE UNIQUE INDEX "AgentOrder_organizationId_idempotencyKey_key" ON "AgentOrder"("organizationId", "idempotencyKey");
+CREATE INDEX "AgentOrder_organizationId_assetId_idx" ON "AgentOrder"("organizationId", "assetId");
+CREATE TABLE "AgentEvent" (
+  "id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL,
+  "actorId" TEXT NOT NULL, "action" TEXT NOT NULL, "reason" TEXT NOT NULL, "outcome" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "AgentEvent_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "AgentOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "AgentEvent_organizationId_orderId_idx" ON "AgentEvent"("organizationId", "orderId");
+CREATE TABLE "AgentDraft" (
+  "id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL,
+  "kind" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'pending_approval', "description" TEXT NOT NULL, "evidenceJson" TEXT, "resolutionJson" TEXT, "partSpecification" TEXT, "quantity" INTEGER, "revision" INTEGER NOT NULL DEFAULT 0, "approvalVersion" INTEGER,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL,
+  CONSTRAINT "AgentDraft_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "AgentOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "AgentDraft_orderId_kind_key" ON "AgentDraft"("orderId", "kind");
+CREATE INDEX "AgentDraft_organizationId_status_idx" ON "AgentDraft"("organizationId", "status");
+CREATE TABLE "AgentLink" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL, "requestId" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AgentLink_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "AgentOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "AgentLink_requestId_key" ON "AgentLink"("requestId");
+CREATE INDEX "AgentLink_organizationId_orderId_idx" ON "AgentLink"("organizationId", "orderId");
+CREATE TABLE "AgentClaim" ("requestId" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL, "kind" TEXT NOT NULL);
+CREATE INDEX "AgentClaim_organizationId_orderId_idx" ON "AgentClaim"("organizationId", "orderId");
+CREATE TABLE "AgentClosure" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL, "authorId" TEXT NOT NULL, "technicianId" TEXT NOT NULL, "requestVersion" DATETIME NOT NULL, "assetId" TEXT NOT NULL, "issueCode" TEXT NOT NULL, "workPerformed" TEXT NOT NULL, "verificationResult" TEXT NOT NULL, "verificationNote" TEXT NOT NULL, "verificationPerformed" BOOLEAN NOT NULL, "observedIssueMatches" BOOLEAN NOT NULL, "state" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "AgentClosure_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "AgentOrder" ("id") ON DELETE CASCADE ON UPDATE CASCADE);
+CREATE INDEX "AgentClosure_organizationId_orderId_idx" ON "AgentClosure"("organizationId", "orderId");
+CREATE TABLE "AgentIntake" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "requestId" TEXT NOT NULL, "createdBy" TEXT NOT NULL, "state" TEXT NOT NULL, "factsJson" TEXT NOT NULL, "questionsJson" TEXT NOT NULL, "historyJson" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL);
+CREATE INDEX "AgentIntake_organizationId_requestId_idx" ON "AgentIntake"("organizationId", "requestId");
+CREATE TABLE "AgentAvailability" ("technicianId" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "available" BOOLEAN NOT NULL DEFAULT false, "updatedAt" DATETIME NOT NULL);
+CREATE INDEX "AgentAvailability_organizationId_available_idx" ON "AgentAvailability"("organizationId", "available");
+CREATE TABLE "AgentDemoPolicy" ("organizationId" TEXT NOT NULL PRIMARY KEY, "enabled" BOOLEAN NOT NULL DEFAULT false, "issueCodesJson" TEXT NOT NULL, "urgentWordsJson" TEXT NOT NULL, "maxWorkload" INTEGER NOT NULL, "updatedAt" DATETIME NOT NULL);
+CREATE TABLE "AgentDemoFixture" ("requestId" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "assetId" TEXT NOT NULL, "issueCode" TEXT NOT NULL, "riskStatus" TEXT NOT NULL, "requestVersion" DATETIME NOT NULL, "assessedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "assessedBy" TEXT NOT NULL);
+CREATE INDEX "AgentDemoFixture_organizationId_idx" ON "AgentDemoFixture"("organizationId");
+CREATE TABLE "AgentCommand" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "orderId" TEXT NOT NULL, "idempotencyKey" TEXT NOT NULL, "inputHash" TEXT NOT NULL, "resultState" TEXT NOT NULL, "technicianId" TEXT, "safetyReviewId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "AgentCommand_organizationId_idempotencyKey_key" ON "AgentCommand"("organizationId", "idempotencyKey");
+CREATE INDEX "AgentCommand_organizationId_orderId_idx" ON "AgentCommand"("organizationId", "orderId");
+CREATE TABLE "AgentAudit" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "actorId" TEXT NOT NULL, "action" TEXT NOT NULL, "outcome" TEXT NOT NULL, "reasonCode" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "AgentAudit_organizationId_createdAt_idx" ON "AgentAudit"("organizationId", "createdAt");
+CREATE TABLE "AgentReportSnapshot" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "actorId" TEXT NOT NULL, "generatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "dataJson" TEXT NOT NULL);
+CREATE INDEX "AgentReportSnapshot_organizationId_generatedAt_idx" ON "AgentReportSnapshot"("organizationId", "generatedAt");
+CREATE TABLE "AgentSafetyReview" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "requestId" TEXT NOT NULL, "actorId" TEXT NOT NULL, "fingerprint" TEXT NOT NULL, "evidenceRef" TEXT NOT NULL, "reasonCode" TEXT NOT NULL, "state" TEXT NOT NULL, "requestVersion" DATETIME NOT NULL, "orderId" TEXT, "orderRevision" INTEGER, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "expiresAt" DATETIME NOT NULL);
+CREATE INDEX "AgentSafetyReview_organizationId_requestId_createdAt_idx" ON "AgentSafetyReview"("organizationId", "requestId", "createdAt");

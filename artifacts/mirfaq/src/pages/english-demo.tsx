@@ -1,0 +1,90 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useLocation } from 'wouter';
+import { useLogin, useCreateRequest, useGetRequests, useGetRequestComments, useCreateComment, getGetRequestCommentsQueryKey, getGetRequestsQueryKey } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { useAuth, type ExtAuthUser } from '@/context/AuthContext';
+
+const shell = 'min-h-screen bg-slate-50 px-5 py-10 text-slate-900';
+const panel = 'rounded-xl border border-slate-200 bg-white p-6 shadow-sm';
+const button = 'inline-block rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50';
+
+function EnglishReportDetails({requestId,attachmentType='initial'}:{requestId:string;attachmentType?:'initial'|'completion'}) {
+  const qc=useQueryClient(); const [comment,setComment]=useState(''), [files,setFiles]=useState<File[]>([]), [message,setMessage]=useState(''), [uploading,setUploading]=useState(false);
+  const {data:comments=[],isLoading,isError}=useGetRequestComments(requestId);
+  const {mutate,isPending}=useCreateComment({mutation:{onSuccess(){qc.invalidateQueries({queryKey:getGetRequestCommentsQueryKey(requestId)});setComment('');setMessage('Comment saved.');},onError(){setMessage('Could not confirm the comment was saved.');}}});
+  async function upload(){if(!files.length || uploading)return;setUploading(true);setMessage('');try{const data=new FormData();files.forEach(file=>data.append('images',file));data.append('attachmentType',attachmentType);const response=await fetch(`/api/requests/${encodeURIComponent(requestId)}/attachments`,{method:'POST',credentials:'include',body:data});if(!response.ok)throw Error();setFiles([]);setMessage('Images uploaded. The app does not inspect attachment contents.');}catch{setMessage('Could not confirm the upload. Check the report before retrying.');}finally{setUploading(false);}}
+  return <div className="mt-3 space-y-3 border-t pt-3"><h3 className="font-semibold">Comments</h3>{isLoading?<p>Loading comments…</p>:isError?<p>Could not load comments.</p>:comments.length===0?<p>No comments yet.</p>:comments.map(c=><div key={c.id} className="rounded bg-slate-50 p-2"><p dir="auto" className="font-semibold">{c.authorName}</p><p dir="auto">{c.content}</p></div>)}<label className="block">New comment<input className="block w-full rounded border p-2" value={comment} onChange={e=>setComment(e.target.value)} dir="auto" /></label><button className="rounded border px-3 py-2" disabled={isPending || !comment.trim()} onClick={()=>mutate({requestId,data:{content:comment.trim()}})}>Save comment</button><div><label className="block">Attach up to three images (JPEG, PNG or WebP)<input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={e=>setFiles(Array.from(e.target.files || []).slice(0,3))} /></label><button className="rounded border px-3 py-2" disabled={uploading || files.length===0} onClick={upload}>{uploading?'Uploading…':'Upload images'}</button></div>{message && <p role="status">{message}</p>}</div>;
+}
+
+function EnglishRating({requestId,rating,comment}:{requestId:string;rating?:number|null;comment?:string|null}) {
+  const [score,setScore]=useState(0),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');const qc=useQueryClient();
+  async function submit(e:FormEvent){e.preventDefault();if(score<1 || score>5 || busy)return;setBusy(true);setMessage('');try{const r=await fetch(`/api/requests/${encodeURIComponent(requestId)}/rating`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({rating:score,comment:note.trim() || undefined})});if(!r.ok)throw Error();setMessage('Rating saved.');await qc.invalidateQueries({queryKey:getGetRequestsQueryKey()});}catch{setMessage('Could not save the rating.');}finally{setBusy(false);}}
+  if(rating)return <div><p>Your rating: {rating} / 5</p>{comment && <p dir="auto">{comment}</p>}</div>;
+  return <form className="mt-3 space-y-2 rounded bg-slate-50 p-3" onSubmit={submit}><h3 className="font-semibold">Rate the maintenance service</h3><fieldset><legend>Choose a rating out of 5</legend>{[1,2,3,4,5].map(n=><label key={n} className="mr-3"><input type="radio" name={`rating-${requestId}`} value={n} checked={score===n} onChange={()=>setScore(n)} /> {n}</label>)}</fieldset><label className="block">Comment (optional)<textarea className="block w-full rounded border p-2" maxLength={500} value={note} onChange={e=>setNote(e.target.value)} dir="auto" /></label><button className="rounded border px-3 py-2" disabled={busy || !score}>{busy?'Saving…':'Submit rating'}</button>{message && <p role="status">{message}</p>}</form>;
+}
+
+function EnglishTechnicianAction({requestId}:{requestId:string}) {
+  const [busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[message,setMessage]=useState(''); const qc=useQueryClient();
+  async function complete(){if(busy)return;setBusy(true);setMessage('');try{const r=await fetch(`/api/requests/${encodeURIComponent(requestId)}`,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'مكتملة'})});if(!r.ok)throw Error();await qc.invalidateQueries({queryKey:getGetRequestsQueryKey()});setMessage('Report status updated.');setConfirm(false);}catch{setMessage('Could not mark this report complete. Agent orders require a structured report and manager review.');}finally{setBusy(false);}}
+  return <div className="mt-3 space-y-2"><p>For agent orders, use the structured report and manager review. Assignment alone does not prove repair.</p>{confirm?<div className="rounded border p-3"><p>Confirm completion of this eligible report? Agent orders remain subject to manager review.</p><button className="rounded border px-3 py-2" disabled={busy} onClick={complete}>{busy?'Saving…':'Confirm completion'}</button> <button className="rounded border px-3 py-2" disabled={busy} onClick={()=>setConfirm(false)}>Cancel</button></div>:<button className="rounded border px-3 py-2" disabled={busy} onClick={()=>setConfirm(true)}>Mark eligible report complete</button>}{message && <p role="status">{message}</p>}<details><summary>Comments and completion attachments</summary><EnglishReportDetails requestId={requestId} attachmentType="completion" /></details></div>;
+}
+
+export function EnglishLanding() {
+  return <main className={shell} dir="ltr"><div className="mx-auto max-w-5xl space-y-10">
+    <header className="flex items-center justify-between"><strong className="text-2xl text-teal-800">Mirfaq</strong><Link href="/login" className={button}>Open demo</Link></header>
+    <section className="max-w-3xl space-y-5 py-10"><p className="font-semibold text-teal-700">LOCAL MAINTENANCE PROTOTYPE</p><h1 className="text-5xl font-bold leading-tight">From maintenance report to a verifiable next step.</h1><p className="text-lg text-slate-600">Mirfaq helps a manager clarify a report, assess risk, select an eligible technician and verify a saved work order.</p><Link href="/login" className={button}>Try the demo</Link></section>
+    <div className="grid gap-4 md:grid-cols-3">{[['Understand','Arabic reports remain in their original language.'],['Act with controls','Routine demo actions use bounded tools and server policies.'],['Verify and follow up','Assignment is recorded separately from technician receipt.']].map(([a,b])=><section key={a} className={panel}><h2 className="text-xl font-bold">{a}</h2><p className="mt-2 text-slate-600">{b}</p></section>)}</div>
+    <p className="text-sm text-slate-600">Synthetic data only. This prototype does not establish a field repair or real-time technician availability.</p>
+  </div></main>;
+}
+
+export function EnglishLogin() {
+  const [, navigate] = useLocation(); const { setUser } = useAuth();
+  const [email,setEmail] = useState(''); const [password,setPassword] = useState(''); const [error,setError] = useState('');
+  const { mutate, isPending } = useLogin({ mutation: { onSuccess(user) { setUser(user as ExtAuthUser); navigate(({manager:'/manager',resident:'/resident',technician:'/technician'} as Record<string,string>)[user.role] || '/login'); }, onError() { setError('Sign-in failed. Check your email and password.'); } } });
+  function submit(e: FormEvent) { e.preventDefault(); if (!email.trim() || !password.trim()) { setError('Enter your email and password.'); return; } setError(''); mutate({data:{email:email.trim(),password}}); }
+  return <main className={shell} dir="ltr"><div className="mx-auto max-w-md space-y-5"><Link href="/" className="text-teal-700 underline">← Back to home</Link><div><h1 className="text-3xl font-bold">Sign in to Mirfaq</h1><p className="text-slate-600">Use the synthetic demo account below.</p></div><form className={`${panel} space-y-4`} onSubmit={submit}>
+    {error && <p role="alert" className="rounded bg-red-50 p-3 text-red-700">{error}</p>}
+    <label className="block">Email<input className="mt-1 block w-full rounded border p-2" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" /></label>
+    <label className="block">Password<input className="mt-1 block w-full rounded border p-2" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" /></label>
+    <button className={button} disabled={isPending}>{isPending ? 'Signing in…' : 'Sign in'}</button></form>
+    <section className={panel}><h2 className="font-bold">Demo accounts</h2><div className="mt-3 flex flex-col gap-2">{[['Manager','manager@mirfaq.sa'],['Resident','resident@mirfaq.sa'],['Technician','technician@mirfaq.sa']].map(([role,address])=><button key={address} className="rounded border p-3 text-left" onClick={()=>{setEmail(address);setPassword('Demo123!');setError('');}}>{role} · {address} · Demo123!</button>)}</div></section>
+  </div></main>;
+}
+
+function EnglishManagerContent() {
+  const { user, logout } = useAuth(); const [,navigate] = useLocation();
+  const [count,setCount] = useState<number | null>(null); const [failed,setFailed] = useState(false);
+  useEffect(()=>{ fetch('/api/requests',{credentials:'include'}).then(r=>{if(!r.ok) throw Error();return r.json();}).then((items: unknown[])=>setCount(items.length)).catch(()=>setFailed(true)); },[]);
+  async function signOut() { await fetch('/api/auth/logout',{method:'POST',credentials:'include'}); logout(); navigate('/login'); }
+  return <main className={shell} dir="ltr"><div className="mx-auto max-w-5xl space-y-6"><header className="flex flex-wrap items-center justify-between gap-4"><div><p className="font-bold text-teal-700">MIRFAQ · DEMO</p><h1 className="text-3xl font-bold">Manager dashboard</h1><p className="text-slate-600">{user?.organizationName}</p></div><button onClick={signOut} className="rounded border px-4 py-2">Sign out</button></header>
+    <section className="rounded-xl bg-amber-50 p-4 text-sm">Synthetic data only. Technician availability and risk confirmation are entered by the manager; they are not live field measurements.</section>
+    <div className="grid gap-4 md:grid-cols-3"><section className={panel}><p className="text-slate-600">Reports</p><p className="text-3xl font-bold">{failed ? 'Unavailable' : count === null ? '…' : new Intl.NumberFormat('en').format(count)}</p></section><section className={`${panel} md:col-span-2`}><h2 className="text-xl font-bold">Maintenance agent</h2><p className="my-3 text-slate-600">Inspect a report, configure the synthetic demo, run the agent and review saved results.</p><div className="flex flex-wrap gap-3"><Link href="/agent-workflow" className={button}>Open agent workflow</Link><Link href="/maintenance-advice" className="rounded border border-teal-700 px-4 py-2 text-teal-800">Preliminary review</Link></div></section></div>
+    <div className="flex flex-wrap gap-3"><Link href="/manager/advanced" className="rounded border px-4 py-2">Property, unit, user and billing administration</Link><Link href="/print/monthly" className="rounded border px-4 py-2">Open monthly report for printing</Link></div>
+  </div></main>;
+}
+export function EnglishManager() { return <ProtectedRoute allowedRoles={['manager']}><EnglishManagerContent /></ProtectedRoute>; }
+
+function EnglishResidentContent() {
+  const { user, logout }=useAuth(); const [,navigate]=useLocation(); const qc=useQueryClient();
+  const [title,setTitle]=useState(''), [description,setDescription]=useState(''), [category,setCategory]=useState('تكييف'), [priority,setPriority]=useState('عادي'), [message,setMessage]=useState('');
+  const {data:requests=[],isLoading,isError}=useGetRequests();
+  const {mutate,isPending}=useCreateRequest({mutation:{onSuccess(){qc.invalidateQueries({queryKey:getGetRequestsQueryKey()});setTitle('');setDescription('');setMessage('Report saved. The manager can review it.');},onError(){setMessage('Could not save the report. Check the form and try again.');}}});
+  function submit(e:FormEvent){e.preventDefault();if(!title.trim() || !description.trim() || !user?.unitId){setMessage('Enter a title and description and confirm your assigned unit.');return;}setMessage('');mutate({data:{title:title.trim(),description:description.trim(),category,priority,unitId:user.unitId}});}
+  async function signOut(){await fetch('/api/auth/logout',{method:'POST',credentials:'include'});logout();navigate('/login');}
+  const status:Record<string,string>={'معلّقة':'Pending','قيد التنفيذ':'In progress','مكتملة':'Completed'};
+  return <main className={shell} dir="ltr"><div className="mx-auto max-w-3xl space-y-6"><header className="flex items-center justify-between"><div><p className="font-bold text-teal-700">MIRFAQ · DEMO</p><h1 className="text-3xl font-bold">Resident reports</h1></div><button className="rounded border px-3 py-2" onClick={signOut}>Sign out</button></header><p className="rounded bg-amber-50 p-4">Synthetic data only. Your words are saved unchanged. Limited Arabic and English interpretation is available; unclear reports need human review.</p>
+    <form className={`${panel} space-y-3`} onSubmit={submit}><h2 className="text-xl font-bold">New maintenance report</h2><label className="block">Title<input className="mt-1 block w-full rounded border p-2" value={title} onChange={e=>setTitle(e.target.value)} dir="auto" required /></label><label className="block">Description and location<textarea className="mt-1 block w-full rounded border p-2" value={description} onChange={e=>setDescription(e.target.value)} dir="auto" required /></label><label className="block">Category<select className="mt-1 block w-full rounded border p-2" value={category} onChange={e=>setCategory(e.target.value)}><option value="تكييف">HVAC</option><option value="سباكة">Plumbing</option><option value="كهرباء">Electrical</option><option value="أخرى">Other</option></select></label><label className="block">Reported priority<select className="mt-1 block w-full rounded border p-2" value={priority} onChange={e=>setPriority(e.target.value)}><option value="عادي">Normal</option><option value="عاجل">Urgent</option></select></label><button className={button} disabled={isPending}>{isPending?'Saving…':'Submit report'}</button>{message && <p role="status">{message}</p>}</form>
+    <section className={`${panel} space-y-3`}><h2 className="text-xl font-bold">Your reports</h2>{isLoading?<p>Loading…</p>:isError?<p role="alert">Could not load reports.</p>:requests.length===0?<p>No reports yet.</p>:requests.map(r=><article key={r.id} className="rounded border p-3"><p className="font-semibold" dir="auto">{r.title}</p><p>{status[r.status] || r.status}</p><p dir="auto">{r.description}</p><p className="text-sm text-slate-600">{new Intl.DateTimeFormat('en',{dateStyle:'medium'}).format(new Date(r.createdAt))}</p>{r.status === 'مكتملة' && <EnglishRating requestId={r.id} rating={(r as typeof r & {rating?:number|null}).rating} comment={(r as typeof r & {ratingComment?:string|null}).ratingComment} />}<details><summary className="cursor-pointer text-teal-700">Comments and attachments</summary><EnglishReportDetails requestId={r.id} /></details></article>)}</section>
+  </div></main>;
+}
+export function EnglishResident() { return <ProtectedRoute allowedRoles={['resident']}><EnglishResidentContent /></ProtectedRoute>; }
+
+function EnglishTechnicianContent() {
+  const {logout}=useAuth(); const [,navigate]=useLocation(); const {data:jobs=[],isLoading,isError}=useGetRequests();
+  async function signOut(){await fetch('/api/auth/logout',{method:'POST',credentials:'include'});logout();navigate('/login');}
+  const status:Record<string,string>={'معلّقة':'Pending','قيد التنفيذ':'In progress','مكتملة':'Completed'};
+  return <main className={shell} dir="ltr"><div className="mx-auto max-w-3xl space-y-6"><header className="flex items-center justify-between"><div><p className="font-bold text-teal-700">MIRFAQ · DEMO</p><h1 className="text-3xl font-bold">Technician tasks</h1></div><button className="rounded border px-3 py-2" onClick={signOut}>Sign out</button></header><p className="rounded bg-amber-50 p-4">Synthetic data only. Assignment does not establish delivery, acceptance or field repair.</p><Link href="/agent-evidence" className={button}>Open structured technician report</Link><section className={`${panel} space-y-3`}><h2 className="text-xl font-bold">Assigned reports</h2>{isLoading?<p>Loading…</p>:isError?<p role="alert">Could not load tasks.</p>:jobs.length===0?<p>No reports assigned.</p>:jobs.map(r=><article key={r.id} className="rounded border p-3"><p className="font-semibold" dir="auto">{r.title}</p><p>{status[r.status] || r.status}</p><p dir="auto">{r.description}</p><p className="text-sm text-slate-600">{new Intl.DateTimeFormat('en',{dateStyle:'medium'}).format(new Date(r.createdAt))}</p>{r.status !== 'مكتملة' && <EnglishTechnicianAction requestId={r.id} />}</article>)}</section></div></main>;
+}
+export function EnglishTechnician(){return <ProtectedRoute allowedRoles={['technician']}><EnglishTechnicianContent /></ProtectedRoute>;}

@@ -216,7 +216,7 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground text-right;
+    @apply font-sans antialiased bg-background text-foreground text-start;
   }
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Download, WifiOff, X } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 /**
  * Chrome/Edge fire `beforeinstallprompt` with a deferred prompt we can trigger
@@ -18,6 +19,7 @@ const DISMISS_KEY = 'mirfaq:install-dismissed';
  *  - an "install the app" prompt on browsers that support installation
  */
 export function PwaStatus() {
+  const { language } = useLanguage();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(
@@ -63,23 +65,23 @@ export function PwaStatus() {
     <>
       {isOffline && (
         <div
-          dir="rtl"
+          dir={language === 'en' ? 'ltr' : 'rtl'}
           role="status"
           className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-white"
         >
           <WifiOff className="h-4 w-4" />
-          لا يوجد اتصال بالإنترنت — تُعرض آخر بيانات محفوظة
+          {language === 'en' ? 'You are offline; some features may be unavailable.' : 'لا يوجد اتصال بالإنترنت — تُعرض آخر بيانات محفوظة'}
         </div>
       )}
 
       {installEvent && !dismissed && (
         <div
-          dir="rtl"
+          dir={language === 'en' ? 'ltr' : 'rtl'}
           className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-lg"
         >
           <div className="flex-1">
-            <p className="text-sm font-bold">ثبّت تطبيق مِرفق</p>
-            <p className="text-xs text-muted-foreground">وصول أسرع من الشاشة الرئيسية، ويعمل حتى بدون إنترنت.</p>
+            <p className="text-sm font-bold">{language === 'en' ? 'Install Mirfaq' : 'ثبّت تطبيق مِرفق'}</p>
+            <p className="text-xs text-muted-foreground">{language === 'en' ? 'Quick access from your home screen.' : 'وصول أسرع من الشاشة الرئيسية، ويعمل حتى بدون إنترنت.'}</p>
           </div>
           <button
             type="button"
@@ -87,12 +89,12 @@ export function PwaStatus() {
             className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
           >
             <Download className="h-4 w-4" />
-            تثبيت
+            {language === 'en' ? 'Install' : 'تثبيت'}
           </button>
           <button
             type="button"
             onClick={dismissInstall}
-            aria-label="إخفاء"
+            aria-label={language === 'en' ? 'Dismiss' : 'إخفاء'}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
           >
             <X className="h-4 w-4" />

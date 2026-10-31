@@ -1,0 +1,2 @@
+# Frozen evaluation hashes must be stable across Windows/Linux checkouts.
+artifacts/api-server/evaluation/*frozen.json text eol=lf

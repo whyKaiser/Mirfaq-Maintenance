@@ -110,3 +110,10 @@ pnpm run db:pg:deploy && pnpm run db:generate
 ## التقنية
 
 React، TypeScript، Vite، Tailwind CSS، Express، Prisma، SQLite، TanStack Query وpnpm workspaces.
+
+
+## Autonomous maintenance demo (local, synthetic)
+
+See [the agent prototype guide](docs/agent-prototype.md) for bilingual local setup, bounded model creation/recovery, the separate rules baseline, reproducible tests and disclosed evaluation limits. Recorded evidence includes 200 passing regression tests and two genuine UI model recovery cases. The independent scripted comparison retains its known failure; it does not establish model superiority over rules.
+
+The added agent module was verified locally on SQLite. The older production-stack descriptions above are not evidence that this module was tested on PostgreSQL or is production ready. Assignment does not prove technician receipt or physical repair, and paid model transport is disabled by default.

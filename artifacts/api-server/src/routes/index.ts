@@ -17,6 +17,11 @@ import publicUnitsRouter from "./public-units";
 import preventivePlansRouter from "./preventive-plans";
 import notificationsRouter from "./notifications";
 import billingRouter from "./billing";
+import maintenanceAdviceRouter from "./maintenance-advice";
+import agentWorkflowRouter from "./agent-workflow";
+import agentIntakeRouter from "./agent-intake";
+import agentSafetyRouter from "./agent-safety";
+import modelRecoveryRouter from "./model-recovery";
 
 const router: IRouter = Router();
 
@@ -38,5 +43,10 @@ router.use(publicUnitsRouter);
 router.use(preventivePlansRouter);
 router.use(notificationsRouter);
 router.use(billingRouter);
+router.use(maintenanceAdviceRouter);
+router.use(agentWorkflowRouter);
+router.use(agentIntakeRouter);
+router.use(agentSafetyRouter);
+router.use(modelRecoveryRouter);
 
 export default router;

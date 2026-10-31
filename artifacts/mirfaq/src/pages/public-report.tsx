@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'wouter';
+import { useLanguage } from '@/context/LanguageContext';
 import {
   AlertCircle,
   Building2,
@@ -51,6 +52,7 @@ async function getErrorMessage(response: Response, fallback: string) {
 }
 
 export default function PublicReportPage() {
+  const { language } = useLanguage();
   const { token = '' } = useParams<{ token: string }>();
   const [unit, setUnit] = useState<PublicUnit | null>(null);
   const [form, setForm] = useState<ReportForm>(EMPTY_FORM);
@@ -126,6 +128,17 @@ export default function PublicReportPage() {
       setIsSubmitting(false);
     }
   }
+
+  if (language === 'en') return <main dir="ltr" className="min-h-screen bg-slate-50 px-5 py-10 text-slate-900"><div className="mx-auto max-w-2xl space-y-6"><Link href="/" className="font-bold text-teal-700">Mirfaq</Link>
+    {isLoading ? <p>Loading the report form…</p> : loadError || !unit ? <section className="rounded border bg-white p-6"><h1 className="text-xl font-bold">This link is unavailable</h1><p>Ask the property manager for a new link.</p><p dir="auto" className="text-sm">{loadError}</p></section> : isSuccess ? <section className="rounded border bg-white p-6"><h1 className="text-xl font-bold">Report received</h1><p>The report was saved for the property manager. This does not confirm contact or repair.</p><button className="mt-4 rounded border px-4 py-2" onClick={()=>{setForm(previous=>({...EMPTY_FORM,name:previous.name,phone:previous.phone}));setIsSuccess(false);}}>Submit another report</button></section> : <><header><p dir="auto">{unit.orgName} · {unit.propertyName}</p><h1 className="text-3xl font-bold">Report a maintenance issue</h1><p>Unit {unit.unitNumber}</p></header><form onSubmit={handleSubmit} className="space-y-4 rounded-xl border bg-white p-6"><p>Describe the issue and location. Your text is saved as entered.</p>
+      <label className="block">Name<input className="mt-1 block w-full rounded border p-2" required autoComplete="name" value={form.name} onChange={e=>updateField('name',e.target.value)} dir="auto" /></label>
+      <label className="block">Saudi mobile number<input className="mt-1 block w-full rounded border p-2" required type="tel" autoComplete="tel" pattern="(?:\+?966|0)?5[0-9]{8}" title="Enter a valid Saudi mobile number" value={form.phone} onChange={e=>updateField('phone',e.target.value)} /></label>
+      <label className="block">Issue title<input className="mt-1 block w-full rounded border p-2" required minLength={3} maxLength={120} value={form.title} onChange={e=>updateField('title',e.target.value)} dir="auto" /></label>
+      <label className="block">Description and location<textarea className="mt-1 block w-full rounded border p-2" required minLength={10} maxLength={1000} rows={4} value={form.description} onChange={e=>updateField('description',e.target.value)} dir="auto" /></label>
+      <label className="block">Category<select className="mt-1 block w-full rounded border p-2" value={form.category} onChange={e=>updateField('category',e.target.value)}><option value="تكييف">HVAC</option><option value="سباكة">Plumbing</option><option value="كهرباء">Electrical</option><option value="أخرى">Other</option></select></label>
+      <label className="block">Reported priority<select className="mt-1 block w-full rounded border p-2" value={form.priority} onChange={e=>updateField('priority',e.target.value)}><option value="عادي">Normal</option><option value="عاجل">Urgent</option></select></label>
+      {submitError && <div role="alert">Could not confirm the report was saved. Check before retrying.<p dir="auto">{submitError}</p></div>}<button className="rounded bg-teal-700 px-4 py-2 text-white disabled:opacity-50" disabled={isSubmitting}>{isSubmitting?'Submitting…':'Submit report'}</button></form></>}
+  </div></main>;
 
   return (
     <main

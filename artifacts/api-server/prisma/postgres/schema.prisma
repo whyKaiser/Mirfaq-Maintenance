@@ -107,6 +107,213 @@ model TechnicianProfile {
   preventivePlans PreventivePlan[]
 }
 
+// Explicit demo-domain records for the maintenance workflow. Tenant IDs and
+// linked records are verified by the server before every operation.
+model AgentAsset {
+  id             String   @id @default(cuid())
+  organizationId String
+  unitId         String
+  tag            String
+  kind           String
+  createdAt      DateTime @default(now())
+  @@unique([organizationId, unitId, tag])
+  @@index([organizationId])
+}
+
+model AgentOrder {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String   @unique
+  assetId        String
+  issueCode      String
+  priority       String
+  technicianId   String
+  state          String   @default("assigned")
+  revision       Int      @default(0)
+  deliveryState  String   @default("not_confirmed")
+  idempotencyKey String
+  inputHash      String
+  reportHash     String
+  activeKey      String?  @unique
+  blocker        String?
+  nextStep       String?
+  dueAt          DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         AgentEvent[]
+  drafts         AgentDraft[]
+  links          AgentLink[]
+  closureReports AgentClosure[]
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, assetId])
+}
+
+model AgentClosure {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  orderId            String
+  authorId           String
+  technicianId       String
+  requestVersion     DateTime
+  assetId            String
+  issueCode          String
+  workPerformed      String
+  verificationResult String
+  verificationNote   String
+  verificationPerformed Boolean
+  observedIssueMatches Boolean
+  state              String
+  createdAt          DateTime @default(now())
+  order              AgentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([organizationId, orderId])
+}
+
+model AgentLink {
+  id             String   @id @default(cuid())
+  organizationId String
+  orderId        String
+  requestId      String   @unique
+  createdAt      DateTime @default(now())
+  order          AgentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([organizationId, orderId])
+}
+
+// A request can be a primary order or a linked report, never both.
+model AgentClaim {
+  requestId      String @id
+  organizationId String
+  orderId        String
+  kind           String
+  @@index([organizationId, orderId])
+}
+
+model AgentIntake {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String
+  createdBy      String
+  state          String
+  factsJson      String
+  questionsJson  String
+  historyJson    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([organizationId, requestId])
+}
+
+model AgentAvailability {
+  technicianId   String @id
+  organizationId String
+  available      Boolean @default(false)
+  updatedAt      DateTime @updatedAt
+  @@index([organizationId, available])
+}
+
+model AgentDemoPolicy {
+  organizationId String @id
+  enabled        Boolean @default(false)
+  issueCodesJson String
+  urgentWordsJson String
+  maxWorkload    Int
+  updatedAt      DateTime @updatedAt
+}
+
+model AgentDemoFixture {
+  requestId      String @id
+  organizationId String
+  assetId        String
+  issueCode      String
+  riskStatus     String
+  requestVersion DateTime
+  assessedAt     DateTime @default(now())
+  assessedBy     String
+  @@index([organizationId])
+}
+
+model AgentCommand {
+  id              String   @id @default(cuid())
+  organizationId  String
+  orderId         String
+  idempotencyKey  String
+  inputHash       String
+  resultState     String
+  technicianId    String?
+  safetyReviewId  String?
+  createdAt       DateTime @default(now())
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, orderId])
+}
+
+model AgentAudit {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String
+  action         String
+  outcome        String
+  reasonCode     String
+  createdAt      DateTime @default(now())
+  @@index([organizationId, createdAt])
+}
+
+model AgentReportSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String
+  generatedAt    DateTime @default(now())
+  dataJson       String
+  @@index([organizationId, generatedAt])
+}
+
+model AgentSafetyReview {
+  id             String   @id @default(cuid())
+  organizationId String
+  requestId      String
+  actorId        String
+  fingerprint    String
+  evidenceRef    String
+  reasonCode     String
+  state          String
+  requestVersion DateTime
+  orderId        String?
+  orderRevision  Int?
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  @@index([organizationId, requestId, createdAt])
+}
+
+model AgentDraft {
+  id             String   @id @default(cuid())
+  organizationId String
+  orderId        String
+  kind           String
+  status         String   @default("pending_approval")
+  description    String
+  evidenceJson   String?
+  resolutionJson String?
+  partSpecification String?
+  quantity       Int?
+  revision       Int      @default(0)
+  approvalVersion Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  order          AgentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@unique([orderId, kind])
+  @@index([organizationId, status])
+}
+
+model AgentEvent {
+  id             String   @id @default(cuid())
+  organizationId String
+  orderId        String
+  actorId        String
+  action         String
+  reason         String
+  outcome        String
+  createdAt      DateTime @default(now())
+  order          AgentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  @@index([organizationId, orderId])
+}
+
 model MaintenanceRequest {
   id               String    @id @default(cuid())
   title            String

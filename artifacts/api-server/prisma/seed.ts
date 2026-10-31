@@ -196,6 +196,14 @@ async function main() {
     create: { id: "unit-7a", number: "7A", floor: 7, propertyId: property1.id, residentId: resident3.id },
   });
 
+  for (const asset of [
+    { id: 'demo-ac-7a', unitId: unit7A.id, tag: 'AC-7A', kind: 'hvac' },
+    { id: 'demo-ac-3b', unitId: unit3B.id, tag: 'AC-3B', kind: 'hvac' },
+    { id: 'demo-water-villa', unitId: unitVilla12.id, tag: 'WATER-V12', kind: 'plumbing' },
+  ]) {
+    await prisma.agentAsset.upsert({ where: { id: asset.id }, update: {}, create: { ...asset, organizationId: org.id } });
+  }
+
   await prisma.unit.upsert({
     where: { id: "unit-studio9" },
     update: {},

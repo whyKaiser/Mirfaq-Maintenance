@@ -1,0 +1,10 @@
+[
+  { "id": "h1", "text": "تتساقط المياه من جهاز التكييف", "issue": "hvac_leak", "hazard": false },
+  { "id": "h2", "text": "المكيف شغال بس الهواء حار", "issue": "hvac_no_cooling", "hazard": false },
+  { "id": "h3", "text": "المواسير بتنقط تحت المغسلة", "issue": "water_leak", "hazard": false },
+  { "id": "h4", "text": "في شرر من المقبس", "issue": "electrical_fault", "hazard": true },
+  { "id": "h5", "text": "المكيف يقطر ماء ولا يبرد", "issue": "unknown", "hazard": false },
+  { "id": "h6", "text": "تسريب ماء بجانب لوحة التوزيع", "issue": "water_leak", "hazard": true },
+  { "id": "h7", "text": "الباب انخلع في الممر", "issue": "unknown", "hazard": false },
+  { "id": "h8", "text": "المكيف يبرد جيدًا", "issue": "unknown", "hazard": false }
+]

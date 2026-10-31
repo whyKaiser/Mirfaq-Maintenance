@@ -67,6 +67,8 @@ interface OrgSettings {
   city: string;
   brandColor: string;
 }
+import { useAdvancedText } from '@/context/advanced-translations';
+import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -112,6 +114,7 @@ function UnitQrModal({
   onClose: () => void;
   onTokenRotated: (unit: Unit) => void;
 }) {
+  const t = useAdvancedText();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isRotating, setIsRotating] = useState(false);
   const [confirmRotation, setConfirmRotation] = useState(false);
@@ -149,12 +152,12 @@ function UnitQrModal({
         | (Partial<Unit> & { publicToken?: string; error?: string })
         | null;
       if (!response.ok || !payload?.publicToken) {
-        throw new Error(payload?.error || 'تعذّر تجديد رمز QR');
+        throw new Error(t('تعذّر تجديد رمز QR'));
       }
       onTokenRotated({ ...unit, ...payload } as Unit);
       setConfirmRotation(false);
     } catch (error) {
-      setRotationError(error instanceof Error ? error.message : 'تعذّر تجديد رمز QR');
+      setRotationError(error instanceof Error ? error.message : t('تعذّر تجديد رمز QR'));
     } finally {
       setIsRotating(false);
     }
@@ -165,10 +168,10 @@ function UnitQrModal({
       <div className="w-full max-w-sm rounded-3xl border bg-card p-6 text-center shadow-2xl">
         <div className="mb-5 flex items-center justify-between text-right">
           <div>
-            <h2 className="font-bold">رمز بلاغ الوحدة</h2>
+            <h2 className="font-bold">{t('رمز بلاغ الوحدة')}</h2>
             <p className="text-sm text-muted-foreground">{propertyName} — {unit.number}</p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label="إغلاق"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-muted" aria-label={t('إغلاق')}><X className="h-5 w-5" /></button>
         </div>
         {reportUrl ? (
           <>
@@ -176,15 +179,15 @@ function UnitQrModal({
               <QRCodeCanvas value={reportUrl} size={220} level="H" marginSize={1} />
             </div>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
-              نزّل الرمز وضعه داخل الوحدة. يفتح صفحة بلاغ عامة وآمنة بدون تسجيل دخول.
+              {t('نزّل الرمز وضعه داخل الوحدة. يفتح صفحة بلاغ عامة وآمنة بدون تسجيل دخول.')}
             </p>
             <button onClick={downloadQr} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground">
-              <Download className="h-4 w-4" /> تنزيل PNG
+              <Download className="h-4 w-4" /> {t('تنزيل PNG')}
             </button>
             {confirmRotation ? (
               <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-right">
                 <p className="text-xs leading-5 text-amber-900">
-                  الرمز الحالي سيتوقف فورًا. نزّل الرمز الجديد واستبدل الملصق القديم.
+                  {t('الرمز الحالي سيتوقف فورًا. نزّل الرمز الجديد واستبدل الملصق القديم.')}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -194,7 +197,7 @@ function UnitQrModal({
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
                   >
                     <RefreshCcw className={`h-3.5 w-3.5 ${isRotating ? 'animate-spin' : ''}`} />
-                    {isRotating ? 'جارٍ التجديد…' : 'نعم، جدّد الرمز'}
+                    {isRotating ? t('جارٍ التجديد…') : t('نعم، جدّد الرمز')}
                   </button>
                   <button
                     type="button"
@@ -202,7 +205,7 @@ function UnitQrModal({
                     disabled={isRotating}
                     className="rounded-xl border border-amber-300 px-3 py-2 text-xs font-medium text-amber-900 disabled:opacity-60"
                   >
-                    إلغاء
+                    {t('إلغاء')}
                   </button>
                 </div>
               </div>
@@ -213,14 +216,14 @@ function UnitQrModal({
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <RefreshCcw className="h-4 w-4" />
-                تجديد الرمز
+                {t('تجديد الرمز')}
               </button>
             )}
             {rotationError && <p className="mt-2 text-xs text-destructive">{rotationError}</p>}
           </>
         ) : (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-            رمز البلاغ العام غير متاح لهذه الوحدة بعد. حدّث الصفحة بعد ترقية قاعدة البيانات.
+            {t('رمز البلاغ العام غير متاح لهذه الوحدة بعد. حدّث الصفحة بعد ترقية قاعدة البيانات.')}
           </div>
         )}
       </div>
@@ -264,6 +267,7 @@ function PriorityBadge({ p }: { p: string }) {
 function ConfirmDialog({
   message, onConfirm, onCancel, isPending,
 }: { message: string; onConfirm: () => void; onCancel: () => void; isPending?: boolean }) {
+  const t = useAdvancedText();
   return (
     <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
@@ -279,13 +283,13 @@ function ConfirmDialog({
             disabled={isPending}
             className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-60"
           >
-            {isPending ? 'جارٍ الحذف…' : 'حذف'}
+            {isPending ? t('جارٍ الحذف…') : t('حذف')}
           </button>
           <button
             onClick={onCancel}
             className="flex-1 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors"
           >
-            إلغاء
+            {t('إلغاء')}
           </button>
         </div>
       </div>
@@ -296,13 +300,15 @@ function ConfirmDialog({
 // ─── property modal ────────────────────────────────────────────────────────────
 
 function PropertyModal({
-  initial, onSave, onClose, isPending,
+  initial, onSave, onClose, isPending, error,
 }: {
   initial?: Property;
   onSave: (name: string, address: string) => void;
   onClose: () => void;
   isPending: boolean;
+  error?: string;
 }) {
+  const t = useAdvancedText();
   const [name, setName] = useState(initial?.name ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const isEdit = !!initial;
@@ -311,25 +317,26 @@ function PropertyModal({
     <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="font-bold">{isEdit ? 'تعديل العقار' : 'إضافة عقار جديد'}</h2>
+          <h2 className="font-bold">{isEdit ? t('تعديل العقار') : t('إضافة عقار جديد')}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {error && <p role="alert" className="text-destructive">{error}</p>}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">اسم العقار</label>
+            <label className="text-sm font-medium">{t('اسم العقار')}</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="مثال: مجمع الياسمين السكني"
+              placeholder={t('مثال: مجمع الياسمين السكني')}
               className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">العنوان</label>
+            <label className="text-sm font-medium">{t('العنوان')}</label>
             <input
               value={address}
               onChange={e => setAddress(e.target.value)}
-              placeholder="مثال: حي الياسمين، الرياض"
+              placeholder={t('مثال: حي الياسمين، الرياض')}
               className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
@@ -340,10 +347,10 @@ function PropertyModal({
             disabled={isPending || !name.trim() || !address.trim()}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
           >
-            {isPending ? 'جارٍ الحفظ…' : isEdit ? 'حفظ التغييرات' : 'إضافة العقار'}
+            {isPending ? t('جارٍ الحفظ…') : isEdit ? t('حفظ التغييرات') : t('إضافة العقار')}
           </button>
           <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">
-            إلغاء
+            {t('إلغاء')}
           </button>
         </div>
       </div>
@@ -354,14 +361,16 @@ function PropertyModal({
 // ─── unit modal ────────────────────────────────────────────────────────────────
 
 function UnitModal({
-  initial, residents, onSave, onClose, isPending,
+  initial, residents, onSave, onClose, isPending, error,
 }: {
   initial?: Unit;
   residents: ResidentUser[];
   onSave: (number: string, floor: number, residentId: string | null) => void;
   onClose: () => void;
   isPending: boolean;
+  error?: string;
 }) {
+  const t = useAdvancedText();
   const [number, setNumber] = useState(initial?.number ?? '');
   const [floor, setFloor] = useState(String(initial?.floor ?? '1'));
   const [residentId, setResidentId] = useState(initial?.residentId ?? '');
@@ -371,22 +380,23 @@ function UnitModal({
     <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="font-bold">{isEdit ? 'تعديل الوحدة' : 'إضافة وحدة جديدة'}</h2>
+          <h2 className="font-bold">{isEdit ? t('تعديل الوحدة') : t('إضافة وحدة جديدة')}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {error && <p role="alert" className="text-destructive">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">رقم الوحدة</label>
+              <label className="text-sm font-medium">{t('رقم الوحدة')}</label>
               <input
                 value={number}
                 onChange={e => setNumber(e.target.value)}
-                placeholder="مثال: 3B"
+                placeholder={t('مثال: 3B')}
                 className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">الطابق</label>
+              <label className="text-sm font-medium">{t('الطابق')}</label>
               <input
                 type="number"
                 value={floor}
@@ -397,20 +407,20 @@ function UnitModal({
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">الساكن (اختياري)</label>
+            <label className="text-sm font-medium">{t('الساكن (اختياري)')}</label>
             <select
               value={residentId}
               onChange={e => setResidentId(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <option value="">— لم يُسكَّن بعد —</option>
+              <option value="">{t('— لم يُسكَّن بعد —')}</option>
               {residents.map(r => (
                 <option
                   key={r.id}
                   value={r.id}
                   disabled={!!r.unitId && r.unitId !== initial?.id}
                 >
-                  {r.name}{r.unitId && r.unitId !== initial?.id ? ` (مسكَّن في ${r.unitNumber})` : ''}
+                  {r.name}{r.unitId && r.unitId !== initial?.id ? ` (${t('الساكن')} · ${r.unitNumber})` : ''}
                 </option>
               ))}
             </select>
@@ -426,10 +436,10 @@ function UnitModal({
             disabled={isPending || !number.trim() || !floor}
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
           >
-            {isPending ? 'جارٍ الحفظ…' : isEdit ? 'حفظ التغييرات' : 'إضافة الوحدة'}
+            {isPending ? t('جارٍ الحفظ…') : isEdit ? t('حفظ التغييرات') : t('إضافة الوحدة')}
           </button>
           <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">
-            إلغاء
+            {t('إلغاء')}
           </button>
         </div>
       </div>
@@ -663,19 +673,20 @@ const RESOURCE_ROWS: { key: 'units' | 'properties' | 'managers' | 'technicians';
   { key: 'technicians', label: 'الفنيون' },
 ];
 
-function money(value: number) {
-  return value.toLocaleString('ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function money(value: number, language: string = 'ar') {
+  return value.toLocaleString(language === 'en' ? 'en-US' : 'ar-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function UsageBar({ current, limit }: { current: number; limit: number | null }) {
+  const t = useAdvancedText();
   if (limit === null) {
-    return <p className="text-xs text-muted-foreground">{current} · بلا حد</p>;
+    return <p className="text-xs text-muted-foreground">{current} · {t('بلا حد')}</p>;
   }
   const pct = Math.min(100, Math.round((current / Math.max(limit, 1)) * 100));
   const nearLimit = pct >= 80;
   return (
     <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{current} من {limit}</p>
+      <p className="text-xs text-muted-foreground">{current} {t('من')} {limit}</p>
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div
           className={`h-full rounded-full ${nearLimit ? 'bg-destructive' : 'bg-primary'}`}
@@ -687,6 +698,8 @@ function UsageBar({ current, limit }: { current: number; limit: number | null })
 }
 
 function BillingView() {
+  const t = useAdvancedText();
+  const { language } = useLanguage();
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
@@ -707,7 +720,7 @@ function BillingView() {
       setPlans(await planRes.json());
       setInvoices(await invRes.json());
     } catch {
-      setError('تعذّر تحميل بيانات الاشتراك');
+      setError(t('تعذّر تحميل بيانات الاشتراك'));
     }
     setIsLoading(false);
   }
@@ -725,10 +738,10 @@ function BillingView() {
         body: JSON.stringify({ planCode }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? 'تعذّر تغيير الباقة');
+      if (!res.ok) throw new Error(t('تعذّر تغيير الباقة'));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذّر تغيير الباقة');
+      setError(err instanceof Error ? err.message : t('تعذّر تغيير الباقة'));
     }
     setBusy(false);
   }
@@ -746,7 +759,7 @@ function BillingView() {
       if (!res.ok) throw new Error();
       await load();
     } catch {
-      setError('تعذّر إصدار فاتورة الشهر الحالي');
+      setError(t('تعذّر إصدار فاتورة الشهر الحالي'));
     }
     setBusy(false);
   }
@@ -763,7 +776,7 @@ function BillingView() {
       if (!res.ok) throw new Error();
       await load();
     } catch {
-      setError('تعذّر تحديث حالة الفاتورة');
+      setError(t('تعذّر تحديث حالة الفاتورة'));
     }
     setBusy(false);
   }
@@ -777,8 +790,8 @@ function BillingView() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div>
-        <h1 className="text-2xl font-bold">الاشتراك والفوترة</h1>
-        <p className="text-muted-foreground text-sm mt-1">الباقة الحالية وحدود الاستخدام والفواتير الشهرية</p>
+        <h1 className="text-2xl font-bold">{t('الاشتراك والفوترة')}</h1>
+        <p className="text-muted-foreground text-sm mt-1">{t('الباقة الحالية وحدود الاستخدام والفواتير الشهرية')}</p>
       </div>
 
       {error && (
@@ -791,24 +804,24 @@ function BillingView() {
         <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground">الباقة الحالية</p>
-              <p className="text-xl font-bold">{subscription.planName}</p>
+              <p className="text-sm text-muted-foreground">{t('الباقة الحالية')}</p>
+              <p className="text-xl font-bold">{t(subscription.planName)}</p>
             </div>
             <div className="text-left">
-              <p className="text-sm text-muted-foreground">الاشتراك الشهري</p>
+              <p className="text-sm text-muted-foreground">{t('الاشتراك الشهري')}</p>
               <p className="text-xl font-bold">
-                {subscription.isCustomPriced ? 'حسب الاحتياج' : `${money(subscription.monthlyPrice ?? 0)} ر.س`}
+                {subscription.isCustomPriced ? t('حسب الاحتياج') : `${money(subscription.monthlyPrice ?? 0,language)} ${language === 'en'?'SAR':'ر.س'}`}
               </p>
             </div>
             <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-bold">
-              {subscription.status}
+              {t(subscription.status)}
             </span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {RESOURCE_ROWS.map(({ key, label }) => (
               <div key={key} className="rounded-xl border border-border p-3">
-                <p className="text-sm font-medium mb-2">{label}</p>
+                <p className="text-sm font-medium mb-2">{t(label)}</p>
                 <UsageBar current={subscription.usage[key]} limit={subscription.limits[key]} />
               </div>
             ))}
@@ -817,7 +830,7 @@ function BillingView() {
       )}
 
       <div>
-        <h2 className="text-lg font-bold mb-3">الباقات المتاحة</h2>
+        <h2 className="text-lg font-bold mb-3">{t('الباقات المتاحة')}</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {plans.map(plan => {
             const isCurrent = plan.code === subscription?.planCode;
@@ -826,14 +839,14 @@ function BillingView() {
                 key={plan.code}
                 className={`rounded-2xl border p-4 flex flex-col ${isCurrent ? 'border-primary bg-primary/5' : 'border-border bg-card'}`}
               >
-                <p className="font-bold">{plan.name}</p>
+                <p className="font-bold">{t(plan.name)}</p>
                 <p className="mt-1 text-2xl font-black">
-                  {plan.isCustomPriced ? 'حسب الاحتياج' : `${money(plan.monthlyPrice ?? 0)}`}
-                  {!plan.isCustomPriced && <span className="text-sm font-normal text-muted-foreground"> ر.س/شهر</span>}
+                  {plan.isCustomPriced ? t('حسب الاحتياج') : `${money(plan.monthlyPrice ?? 0,language)}`}
+                  {!plan.isCustomPriced && <span className="text-sm font-normal text-muted-foreground"> {language === 'en'?'SAR/month':'ر.س/شهر'}</span>}
                 </p>
                 <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground flex-1">
                   {plan.features.map(feature => (
-                    <li key={feature} className="flex gap-2"><Check className="w-4 h-4 text-primary shrink-0" />{feature}</li>
+                    <li key={feature} className="flex gap-2"><Check className="w-4 h-4 text-primary shrink-0" />{t(feature)}</li>
                   ))}
                 </ul>
                 <button
@@ -842,7 +855,7 @@ function BillingView() {
                   onClick={() => changePlan(plan.code)}
                   className="mt-4 w-full rounded-xl px-3 py-2 text-sm font-bold bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isCurrent ? 'باقتك الحالية' : 'تحويل لهذه الباقة'}
+                  {isCurrent ? t('باقتك الحالية') : t('تحويل لهذه الباقة')}
                 </button>
               </article>
             );
@@ -852,14 +865,14 @@ function BillingView() {
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold">الفواتير</h2>
+          <h2 className="text-lg font-bold">{t('الفواتير')}</h2>
           <button
             type="button"
             onClick={generateInvoice}
             disabled={busy}
             className="rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm font-bold disabled:opacity-50"
           >
-            إصدار فاتورة الشهر الحالي
+            {t('إصدار فاتورة الشهر الحالي')}
           </button>
         </div>
 
@@ -867,35 +880,35 @@ function BillingView() {
           <table className="w-full text-sm min-w-[42rem]">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="text-right px-3 py-2 font-medium">الشهر</th>
-                <th className="text-right px-3 py-2 font-medium">الباقة</th>
-                <th className="text-right px-3 py-2 font-medium">الاشتراك</th>
-                <th className="text-right px-3 py-2 font-medium">الصيانة</th>
-                <th className="text-right px-3 py-2 font-medium">الضريبة</th>
-                <th className="text-right px-3 py-2 font-medium">الإجمالي</th>
-                <th className="text-right px-3 py-2 font-medium">الحالة</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الشهر')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الباقة')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الاشتراك')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الصيانة')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الضريبة')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الإجمالي')}</th>
+                <th className="text-right px-3 py-2 font-medium">{t('الحالة')}</th>
                 <th className="text-right px-3 py-2 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {invoices.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">لا توجد فواتير بعد</td></tr>
+                <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">{t('لا توجد فواتير بعد')}</td></tr>
               )}
               {invoices.map(inv => (
                 <tr key={inv.id} className="border-t border-border">
                   <td className="px-3 py-2.5 font-medium">{inv.periodLabel}</td>
-                  <td className="px-3 py-2.5">{inv.planName}</td>
-                  <td className="px-3 py-2.5">{money(inv.subscription)}</td>
-                  <td className="px-3 py-2.5">{money(inv.maintenance)}</td>
-                  <td className="px-3 py-2.5">{money(inv.vat)}</td>
-                  <td className="px-3 py-2.5 font-bold">{money(inv.total)} ر.س</td>
-                  <td className="px-3 py-2.5">{inv.status}</td>
+                  <td className="px-3 py-2.5">{t(inv.planName)}</td>
+                  <td className="px-3 py-2.5">{money(inv.subscription,language)}</td>
+                  <td className="px-3 py-2.5">{money(inv.maintenance,language)}</td>
+                  <td className="px-3 py-2.5">{money(inv.vat,language)}</td>
+                  <td className="px-3 py-2.5 font-bold">{money(inv.total,language)} {language === 'en'?'SAR':'ر.س'}</td>
+                  <td className="px-3 py-2.5">{t(inv.status)}</td>
                   <td className="px-3 py-2.5">
                     {inv.status === 'مسودة' && (
-                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'صادرة')} className="text-primary hover:underline disabled:opacity-50">إصدار</button>
+                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'صادرة')} className="text-primary hover:underline disabled:opacity-50">{t('إصدار')}</button>
                     )}
                     {inv.status === 'صادرة' && (
-                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'مدفوعة')} className="text-primary hover:underline disabled:opacity-50">تعليم كمدفوعة</button>
+                      <button type="button" disabled={busy} onClick={() => setInvoiceStatus(inv.id, 'مدفوعة')} className="text-primary hover:underline disabled:opacity-50">{t('تعليم كمدفوعة')}</button>
                     )}
                   </td>
                 </tr>
@@ -1045,6 +1058,7 @@ function generateTempPassword(): string {
 }
 
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const t = useAdvancedText();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('resident');
@@ -1073,11 +1087,11 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         }),
       });
       const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? 'فشل الإنشاء');
+      if (!res.ok) throw new Error(t('فشل الإنشاء'));
       setCreatedPwd(tempPwd.current);
       onCreated();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ');
+      setError(err instanceof Error ? err.message : t('حدث خطأ'));
       setIsPending(false);
     }
   }
@@ -1095,8 +1109,8 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <CheckCircle2 className="w-6 h-6" />
         </div>
         <div className="text-center">
-          <h2 className="font-bold text-lg">تم إنشاء الحساب</h2>
-          <p className="text-sm text-muted-foreground mt-1">سلّم كلمة المرور المؤقتة هذه للمستخدم مباشرةً</p>
+          <h2 className="font-bold text-lg">{t('تم إنشاء الحساب')}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t('سلّم كلمة المرور المؤقتة هذه للمستخدم مباشرةً')}</p>
         </div>
         <div className="bg-muted rounded-xl p-3 flex items-center gap-3">
           <code className="flex-1 text-sm font-mono font-bold tracking-widest" dir="ltr">{createdPwd}</code>
@@ -1105,10 +1119,10 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </button>
         </div>
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">
-          ⚠️ لن تظهر هذه الكلمة مجدداً — احفظها الآن
+          ⚠️ {t('لن تظهر هذه الكلمة مجدداً')} — {t('احفظها الآن')}
         </p>
         <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-          تم، أغلق
+          {t('تم، أغلق')}
         </button>
       </div>
     </div>
@@ -1118,41 +1132,41 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
     <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="font-bold">إضافة مستخدم جديد</h2>
+          <h2 className="font-bold">{t('إضافة مستخدم جديد')}</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">الاسم الكامل</label>
+            <label className="text-sm font-medium">{t('الاسم الكامل')}</label>
             <input value={name} onChange={e => setName(e.target.value)} required
               className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">البريد الإلكتروني</label>
+            <label className="text-sm font-medium">{t('البريد الإلكتروني')}</label>
             <input value={email} onChange={e => setEmail(e.target.value)} type="email" required dir="ltr"
               className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">الدور</label>
+              <label className="text-sm font-medium">{t('الدور')}</label>
               <select value={role} onChange={e => setRole(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                <option value="resident">ساكن</option>
-                <option value="technician">فني</option>
+                <option value="resident">{t('ساكن')}</option>
+                <option value="technician">{t('فني')}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">الهاتف</label>
+              <label className="text-sm font-medium">{t('الهاتف')}</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} dir="ltr"
                 className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
           </div>
           {role === 'technician' && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">التخصص</label>
+              <label className="text-sm font-medium">{t('التخصص')}</label>
               <select value={specialty} onChange={e => setSpecialty(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
-                {['كهرباء','سباكة','تكييف','نجارة','دهانات','صيانة عامة'].map(s => <option key={s}>{s}</option>)}
+                {['كهرباء','سباكة','تكييف','نجارة','دهانات','صيانة عامة'].map(s => <option key={s} value={s}>{t(s)}</option>)}
               </select>
             </div>
           )}
@@ -1165,9 +1179,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
             className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {isPending && <span className="w-4 h-4 border-2 border-primary-foreground/40 border-t-primary-foreground rounded-full animate-spin" />}
-            إنشاء الحساب
+            {t('إنشاء الحساب')}
           </button>
-          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">إلغاء</button>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">{t('إلغاء')}</button>
         </div>
       </div>
     </div>
@@ -1175,31 +1189,30 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 }
 
 function UsersView() {
+  const t = useAdvancedText();
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [error,setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filterRole, setFilterRole] = useState<string>('all');
 
   async function loadUsers() {
-    const res = await fetch('/api/users', { credentials: 'include' });
-    const data = await res.json() as UserRow[];
-    setUsers(data);
-    setIsLoading(false);
+    try { const res = await fetch('/api/users', { credentials: 'include' }); if(!res.ok)throw Error(); const data = await res.json() as UserRow[]; setUsers(data); setError(''); }
+    catch { setError(t('تعذر تحميل البيانات')); } finally { setIsLoading(false); }
   }
 
   useEffect(() => { loadUsers(); }, []);
 
   async function toggleActive(u: UserRow) {
     setTogglingId(u.id);
-    await fetch(`/api/users/${u.id}`, {
+    try { const response = await fetch(`/api/users/${u.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ isActive: !u.isActive }),
-    });
-    await loadUsers();
-    setTogglingId(null);
+    }); if(!response.ok)throw Error(); await loadUsers(); }
+    catch { setError(t('تعذر تحديث الحساب')); } finally { setTogglingId(null); }
   }
 
   const ROLE_LABELS: Record<string, string> = { resident: 'ساكن', technician: 'فني', manager: 'مدير' };
@@ -1208,17 +1221,18 @@ function UsersView() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
+      {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">المستخدمون</h1>
-          <p className="text-muted-foreground text-sm mt-1">إدارة حسابات السكان والفنيين</p>
+          <h1 className="text-2xl font-bold">{t('المستخدمون')}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t('إدارة حسابات السكان والفنيين')}</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          مستخدم جديد
+          {t('مستخدم جديد')}
         </button>
       </div>
 
@@ -1228,7 +1242,7 @@ function UsersView() {
           <button key={v} onClick={() => setFilterRole(v)}
             className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border ${
               filterRole === v ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border hover:border-primary/40'
-            }`}>{l}</button>
+            }`}>{t(l)}</button>
         ))}
       </div>
 
@@ -1240,15 +1254,15 @@ function UsersView() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">لا يوجد مستخدمون في هذا التصنيف</p>
+            <p className="text-sm">{t('لا يوجد مستخدمون في هذا التصنيف')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
             <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/40 text-xs font-medium text-muted-foreground">
-              <span className="col-span-4">الاسم</span>
-              <span className="col-span-3">البريد</span>
-              <span className="col-span-2">الدور</span>
-              <span className="col-span-2">الوحدة / التخصص</span>
+              <span className="col-span-4">{t('الاسم')}</span>
+              <span className="col-span-3">{t('البريد')}</span>
+              <span className="col-span-2">{t('الدور')}</span>
+              <span className="col-span-2">{t('الوحدة / التخصص')}</span>
               <span className="col-span-1" />
             </div>
             {filtered.map(u => (
@@ -1259,7 +1273,7 @@ function UsersView() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{u.name}</p>
-                    {!u.isActive && <span className="text-xs text-destructive">معطّل</span>}
+                    {!u.isActive && <span className="text-xs text-destructive">{t('معطّل')}</span>}
                   </div>
                 </div>
                 <span className="col-span-3 text-xs text-muted-foreground truncate" dir="ltr">{u.email}</span>
@@ -1268,16 +1282,16 @@ function UsersView() {
                     u.role === 'manager' ? 'bg-purple-100 text-purple-700 border-purple-200' :
                     u.role === 'technician' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                     'bg-emerald-100 text-emerald-700 border-emerald-200'
-                  }`}>{ROLE_LABELS[u.role] ?? u.role}</span>
+                  }`}>{t(ROLE_LABELS[u.role] ?? u.role)}</span>
                 </span>
                 <span className="col-span-2 text-xs text-muted-foreground truncate">
-                  {u.unitNumber ?? u.specialty ?? '—'}
+                  {u.unitNumber ?? (u.specialty ? t(u.specialty) : '—')}
                 </span>
                 <div className="col-span-1 flex justify-end">
                   <button
                     onClick={() => toggleActive(u)}
                     disabled={togglingId === u.id}
-                    title={u.isActive ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                    title={t(u.isActive ? 'تعطيل الحساب' : 'تفعيل الحساب')}
                     className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
                       u.isActive
                         ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
@@ -1370,14 +1384,18 @@ function AuditView() {
 // ─── properties view ───────────────────────────────────────────────────────────
 
 function PropertiesView() {
+  const t = useAdvancedText();
+  const { language } = useLanguage();
   const qc = useQueryClient();
   const [modal, setModal] = useState<null | { mode: 'create' } | { mode: 'edit'; property: Property }>(null);
   const [deleting, setDeleting] = useState<Property | null>(null);
+  const [error,setError] = useState('');
 
-  const { data: properties = [], isLoading } = useGetProperties();
+  const { data: properties = [], isLoading, isError } = useGetProperties();
 
   const { mutate: createProp, isPending: creating } = useCreateProperty({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetPropertiesQueryKey() });
         qc.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
@@ -1388,6 +1406,7 @@ function PropertiesView() {
 
   const { mutate: updateProp, isPending: updating } = useUpdateProperty({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetPropertiesQueryKey() });
         setModal(null);
@@ -1397,6 +1416,7 @@ function PropertiesView() {
 
   const { mutate: deleteProp, isPending: delPending } = useDeleteProperty({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetPropertiesQueryKey() });
         qc.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
@@ -1415,17 +1435,18 @@ function PropertiesView() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
+      {(error || isError) && <p role="alert" className="text-destructive">{error || t('تعذر تحميل البيانات')}</p>}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">العقارات</h1>
-          <p className="text-muted-foreground text-sm mt-1">إدارة العقارات المملوكة</p>
+          <h1 className="text-2xl font-bold">{t('العقارات')}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t('إدارة العقارات المملوكة')}</p>
         </div>
         <button
           onClick={() => setModal({ mode: 'create' })}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          إضافة عقار
+          {t('إضافة عقار')}
         </button>
       </div>
 
@@ -1437,15 +1458,15 @@ function PropertiesView() {
         ) : properties.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">لا توجد عقارات. أضف عقارك الأول.</p>
+            <p className="text-sm">{t('لا توجد عقارات. أضف عقارك الأول.')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
             {/* Header */}
             <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/40 text-xs font-medium text-muted-foreground">
-              <span className="col-span-4">اسم العقار</span>
-              <span className="col-span-5">العنوان</span>
-              <span className="col-span-1 text-center">وحدات</span>
+              <span className="col-span-4">{t('اسم العقار')}</span>
+              <span className="col-span-5">{t('العنوان')}</span>
+              <span className="col-span-1 text-center">{t('وحدات')}</span>
               <span className="col-span-2" />
             </div>
             {properties.map(prop => (
@@ -1462,14 +1483,14 @@ function PropertiesView() {
                   <button
                     onClick={() => setModal({ mode: 'edit', property: prop })}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    title="تعديل"
+                    title={t('تعديل')}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setDeleting(prop)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    title="حذف"
+                    title={t('حذف')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -1486,12 +1507,13 @@ function PropertiesView() {
           onSave={handleSave}
           onClose={() => setModal(null)}
           isPending={creating || updating}
+          error={error}
         />
       )}
 
       {deleting && (
         <ConfirmDialog
-          message={`هل أنت متأكد من حذف عقار "${deleting.name}"؟ سيتم حذف جميع الوحدات المرتبطة به.`}
+          message={language === 'en' ? `Delete property "${deleting.name}"? All associated units will also be deleted.` : `هل أنت متأكد من حذف عقار "${deleting.name}"؟ سيتم حذف جميع الوحدات المرتبطة به.`}
           onConfirm={() => deleteProp({ id: deleting.id })}
           onCancel={() => setDeleting(null)}
           isPending={delPending}
@@ -1504,17 +1526,20 @@ function PropertiesView() {
 // ─── units view ────────────────────────────────────────────────────────────────
 
 function UnitsView() {
+  const t = useAdvancedText();
+  const { language } = useLanguage();
   const qc = useQueryClient();
-  const { data: properties = [], isLoading: propsLoading } = useGetProperties();
+  const { data: properties = [], isLoading: propsLoading, isError: propsError } = useGetProperties();
   const [selectedPropId, setSelectedPropId] = useState<string>('');
   const [modal, setModal] = useState<null | { mode: 'create' } | { mode: 'edit'; unit: Unit }>(null);
   const [deleting, setDeleting] = useState<Unit | null>(null);
   const [qrUnit, setQrUnit] = useState<Unit | null>(null);
+  const [error,setError] = useState('');
 
   // Pick first property by default once loaded
   const activePropId = selectedPropId || properties[0]?.id || '';
 
-  const { data: units = [], isLoading: unitsLoading } = useGetUnits(activePropId, {
+  const { data: units = [], isLoading: unitsLoading, isError: unitsError } = useGetUnits(activePropId, {
     query: { enabled: !!activePropId, queryKey: getGetUnitsQueryKey(activePropId) },
   });
 
@@ -1531,6 +1556,7 @@ function UnitsView() {
 
   const { mutate: createUnit, isPending: creating } = useCreateUnit({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetUnitsQueryKey(activePropId) });
         qc.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
@@ -1541,6 +1567,7 @@ function UnitsView() {
 
   const { mutate: updateUnit, isPending: updating } = useUpdateUnit({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetUnitsQueryKey(activePropId) });
         // also refresh residents so assignment states update
@@ -1552,6 +1579,7 @@ function UnitsView() {
 
   const { mutate: deleteUnit, isPending: delPending } = useDeleteUnit({
     mutation: {
+      onError() { setError(t('تعذر حفظ التغيير')); },
       onSuccess() {
         qc.invalidateQueries({ queryKey: getGetUnitsQueryKey(activePropId) });
         qc.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
@@ -1572,10 +1600,11 @@ function UnitsView() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
+      {(error || unitsError || propsError) && <p role="alert" className="text-destructive">{error || t('تعذر تحميل البيانات')}</p>}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">الوحدات السكنية</h1>
-          <p className="text-muted-foreground text-sm mt-1">إدارة الوحدات وربطها بالسكان</p>
+          <h1 className="text-2xl font-bold">{t('الوحدات السكنية')}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t('إدارة الوحدات وربطها بالسكان')}</p>
         </div>
         {activePropId && (
           <button
@@ -1583,7 +1612,7 @@ function UnitsView() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
-            إضافة وحدة
+            {t('إضافة وحدة')}
           </button>
         )}
       </div>
@@ -1594,7 +1623,7 @@ function UnitsView() {
           {[1, 2].map(i => <div key={i} className="h-9 w-32 bg-muted animate-pulse rounded-xl" />)}
         </div>
       ) : properties.length === 0 ? (
-        <p className="text-sm text-muted-foreground">لا توجد عقارات. أضف عقاراً أولاً من قسم العقارات.</p>
+        <p className="text-sm text-muted-foreground">{t('لا توجد عقارات. أضف عقاراً أولاً من قسم العقارات.')}</p>
       ) : (
         <div className="flex gap-2 flex-wrap">
           {properties.map(prop => (
@@ -1624,14 +1653,14 @@ function UnitsView() {
           ) : units.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Home className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">لا توجد وحدات في {activeProp?.name ?? 'هذا العقار'}. أضف الأولى.</p>
+              <p className="text-sm">{language === 'en' ? <>No units in {activeProp?.name ?? 'this property'}. Add the first unit.</> : <>لا توجد وحدات في {activeProp?.name ?? 'هذا العقار'}. أضف الأولى.</>}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
               <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-muted/40 text-xs font-medium text-muted-foreground">
-                <span className="col-span-3">رقم الوحدة</span>
-                <span className="col-span-2">الطابق</span>
-                <span className="col-span-5">الساكن</span>
+                <span className="col-span-3">{t('رقم الوحدة')}</span>
+                <span className="col-span-2">{t('الطابق')}</span>
+                <span className="col-span-5">{t('الساكن')}</span>
                 <span className="col-span-2" />
               </div>
               {units.map(unit => (
@@ -1642,33 +1671,33 @@ function UnitsView() {
                     </div>
                     <span className="text-sm font-medium">{unit.number}</span>
                   </div>
-                  <span className="col-span-2 text-sm text-muted-foreground">الطابق {unit.floor}</span>
+                  <span className="col-span-2 text-sm text-muted-foreground">{t('الطابق')} {unit.floor}</span>
                   <div className="col-span-5">
                     {unit.residentName ? (
                       <span className="text-sm font-medium">{unit.residentName}</span>
                     ) : (
-                      <span className="text-sm text-muted-foreground italic">شاغرة</span>
+                      <span className="text-sm text-muted-foreground italic">{t('شاغرة')}</span>
                     )}
                   </div>
                   <div className="col-span-2 flex items-center justify-end gap-1">
                     <button
                       onClick={() => setQrUnit(unit)}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                      title="رمز QR للبلاغ"
+                      title={t('رمز QR للبلاغ')}
                     >
                       <QrCode className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setModal({ mode: 'edit', unit })}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      title="تعديل"
+                      title={t('تعديل')}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleting(unit)}
                       className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      title="حذف"
+                      title={t('حذف')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -1687,12 +1716,13 @@ function UnitsView() {
           onSave={handleSave}
           onClose={() => setModal(null)}
           isPending={creating || updating}
+          error={error}
         />
       )}
 
       {deleting && (
         <ConfirmDialog
-          message={`هل أنت متأكد من حذف الوحدة "${deleting.number}"؟`}
+          message={language === 'en' ? `Delete unit "${deleting.number}"?` : `هل أنت متأكد من حذف الوحدة "${deleting.number}"؟`}
           onConfirm={() => deleteUnit({ id: deleting.id })}
           onCancel={() => setDeleting(null)}
           isPending={delPending}
@@ -1702,7 +1732,7 @@ function UnitsView() {
       {qrUnit && (
         <UnitQrModal
           unit={qrUnit}
-          propertyName={activeProp?.name ?? 'العقار'}
+          propertyName={activeProp?.name ?? t('العقار')}
           onClose={() => setQrUnit(null)}
           onTokenRotated={updatedUnit => {
             setQrUnit(updatedUnit);
@@ -2376,6 +2406,8 @@ function ManagerContent() {
 
       {/* Main content */}
       <main className="flex-1 mr-16 md:mr-64 p-3 md:p-6 min-h-screen min-w-0">
+        <a href="/maintenance-advice" className="mb-4 inline-block rounded-lg border border-teal-700 px-4 py-2 text-teal-700">مراجعة أولية للبلاغات</a>
+        <a href="/agent-workflow" className="mb-4 mr-3 inline-block rounded-lg border border-teal-700 px-4 py-2 text-teal-700">إعداد أمر صيانة تجريبي</a>
 
         {/* ── Dashboard ── */}
         {activeNav === 'dashboard' && (
@@ -2660,3 +2692,11 @@ export default function ManagerDashboard() {
     </ProtectedRoute>
   );
 }
+
+function AdvancedAdminContent() {
+  const { language }=useLanguage();
+  const [view,setView]=useState<'properties'|'units'|'users'|'billing'>('properties');
+  const items=[['properties','Properties','العقارات'],['units','Units','الوحدات'],['users','Users','المستخدمون'],['billing','Billing','الفوترة']] as const;
+  return <main className="min-h-screen bg-slate-50 p-5 text-slate-900" dir={language === 'en'?'ltr':'rtl'}><div className="mx-auto max-w-6xl space-y-5"><a href="/manager" className="text-teal-700 underline">{language === 'en'?'← Manager dashboard':'العودة للوحة المدير'}</a><h1 className="text-2xl font-bold">{language === 'en'?'Property administration':'إدارة العقارات'}</h1><nav aria-label={language === 'en'?'Administration':'الإدارة'} className="flex flex-wrap gap-2">{items.map(([key,en,ar])=><button key={key} type="button" aria-pressed={view===key} className={`rounded border px-4 py-2 ${view===key?'bg-teal-700 text-white':''}`} onClick={()=>setView(key)}>{language === 'en'?en:ar}</button>)}</nav><p className="text-sm text-slate-600">{language === 'en'?'Names, addresses, plan descriptions and other records are shown as originally stored.':'تظهر الأسماء والعناوين وأوصاف الباقات والسجلات كما حُفظت.'}</p>{view==='properties'?<PropertiesView/>:view==='units'?<UnitsView/>:view==='users'?<UsersView/>:<BillingView/>}</div></main>;
+}
+export function AdvancedAdminPage() { return <ProtectedRoute allowedRoles={['manager']}><AdvancedAdminContent /></ProtectedRoute>; }
